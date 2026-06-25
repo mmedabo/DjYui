@@ -128,27 +128,37 @@ export function useAudioEngine() {
   const getDeck = useCallback((id: 'a' | 'b') => decksRef.current[id] ?? initDeck(id), [initDeck]);
 
   // Call inside a user tap to unlock iOS audio — plays an audible beep to confirm it works
-  const unlockAudio = useCallback(() => {
+  // Returns a debug string describing context state for diagnostics
+  const unlockAudio = useCallback((): string => {
     const ctx = getOrCreateContext();
-    // Resume synchronously (no .then — keep everything in the gesture stack)
-    if (ctx.state === 'suspended') ctx.resume();
+    const state0 = ctx.state;
 
-    // Play an audible 440 Hz beep for 0.15s — confirms audio pipeline is open
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.frequency.value = 440;
-    g.gain.value = 0.4;
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start(0);
-    osc.stop(ctx.currentTime + 0.15);
+    const doBeep = () => {
+      try {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.frequency.value = 440;
+        g.gain.value = 0.5;
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.25);
+      } catch (e) {
+        console.error('beep error', e);
+      }
+    };
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(doBeep).catch(e => console.error('resume error', e));
+      return `ctx was ${state0} → resuming (beep pending) sr:${ctx.sampleRate}`;
+    }
+
+    doBeep();
+    return `ctx:${state0} beep fired sr:${ctx.sampleRate}`;
   }, []);
 
   const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number) => {
     const ctx = getOrCreateContext();
-    // Resume synchronously — don't await, just fire and the audio will queue
-    if (ctx.state === 'suspended') ctx.resume();
-
     const deck = getDeck(deckId);
     deck.playing = playing;
     deck.bpm = bpm;
@@ -160,19 +170,27 @@ export function useAudioEngine() {
       deck.sourceNode = null;
     }
 
-    if (playing) {
-      // Generate buffer synchronously (~10–30 ms on iPhone) — no async needed
+    if (!playing) {
+      deck.gainNode.gain.value = 0;
+      return;
+    }
+
+    const startSource = () => {
+      if (!deck.playing) return; // user stopped before resume resolved
       const buf = getCachedBuffer(ctx, bpm);
       const source = ctx.createBufferSource();
       source.buffer = buf;
       source.loop = true;
       source.connect(deck.gainNode);
-      // Set gain directly — no setTargetAtTime so it works even if ctx just resumed
       deck.gainNode.gain.value = 0.85;
-      source.start(0);
+      source.start(ctx.currentTime);
       deck.sourceNode = source;
+    };
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(startSource).catch(e => console.error('resume error', e));
     } else {
-      deck.gainNode.gain.value = 0;
+      startSource();
     }
   }, [getDeck]);
 

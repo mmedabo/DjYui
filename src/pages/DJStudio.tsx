@@ -32,6 +32,7 @@ export function DJStudio() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [mixName, setMixName] = useState('');
   const [audioStarted, setAudioStarted] = useState(false);
+  const [audioDebug, setAudioDebug] = useState<string>('');
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const yuiTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
@@ -318,26 +319,35 @@ export function DJStudio() {
           </button>
         </motion.div>
 
-        {/* Audio not started notice — tapping this unlocks iOS audio */}
+        {/* Audio unlock + debug */}
         {!audioStarted && (
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             onClick={() => {
-              audio.unlockAudio();
+              const status = audio.unlockAudio();
+              setAudioDebug(status);
               setAudioStarted(true);
             }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-2xl text-sm z-50 active:scale-95 transition-all"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 px-6 py-4 rounded-2xl text-sm z-50 active:scale-95 transition-all"
             style={{
-              background: 'linear-gradient(135deg, rgba(168,85,247,0.5), rgba(236,72,153,0.4))',
-              border: '1.5px solid rgba(168,85,247,0.9)',
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.6), rgba(236,72,153,0.5))',
+              border: '2px solid rgba(168,85,247,1)',
               color: '#fff',
-              boxShadow: '0 0 20px rgba(168,85,247,0.3)',
+              boxShadow: '0 0 30px rgba(168,85,247,0.6)',
             }}
           >
-            <Volume2 size={16} className="text-purple-300" />
-            <span className="font-bold">Tap to enable audio, then press ▶ Play</span>
+            <div className="flex items-center gap-2 font-bold text-base">
+              <Volume2 size={18} />
+              Tap HERE to start audio
+            </div>
+            <span className="text-xs opacity-70">You should hear a beep</span>
           </motion.button>
+        )}
+        {audioStarted && audioDebug && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/40 z-40 text-center">
+            {audioDebug}
+          </div>
         )}
       </div>
 
