@@ -141,7 +141,7 @@ export function TrackSelector({ deck, currentTrackId, currentTrackName, onSelect
                     <input
                       id={fileInputId}
                       type="file"
-                      accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,audio/*"
+                      accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.mp4,.caf"
                       className="sr-only"
                       onChange={handleFileChange}
                     />
