@@ -40,8 +40,8 @@ export default function App() {
         </motion.div>
       </AnimatePresence>
 
-      {/* YUI persistent panel on all pages except landing, studio, and achievements */}
-      {currentPage !== 'landing' && currentPage !== 'studio' && currentPage !== 'achievements' && <YUIPanel />}
+      {/* YUI persistent panel — not on landing, studio, achievements, or session (session has inline YUI) */}
+      {currentPage !== 'landing' && currentPage !== 'studio' && currentPage !== 'achievements' && currentPage !== 'session' && <YUIPanel />}
     </div>
   );
 }
