@@ -325,7 +325,7 @@ export function DJStudio() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             onClick={() => {
-              const status = audio.unlockAudio();
+              const status = audio.unlockAudio((s) => setAudioDebug(s));
               setAudioDebug(status);
               setAudioStarted(true);
             }}

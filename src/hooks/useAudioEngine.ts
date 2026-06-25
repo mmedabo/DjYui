@@ -127,34 +127,57 @@ export function useAudioEngine() {
 
   const getDeck = useCallback((id: 'a' | 'b') => decksRef.current[id] ?? initDeck(id), [initDeck]);
 
-  // Call inside a user tap to unlock iOS audio — plays an audible beep to confirm it works
-  // Returns a debug string describing context state for diagnostics
-  const unlockAudio = useCallback((): string => {
-    const ctx = getOrCreateContext();
+  // Call inside a user tap to unlock iOS audio.
+  // Recreates the AudioContext fresh inside the gesture so iOS 14.5+ starts it as 'running'.
+  // Returns a debug string; calls onStatus again after the resume promise resolves.
+  const unlockAudio = useCallback((onStatus?: (s: string) => void): string => {
+    // Always tear down and recreate so the new context is born inside this gesture
+    if (globalContext && globalContext.state !== 'closed') {
+      try { globalContext.close(); } catch (_) {}
+    }
+    globalContext = new AudioContext();
+    bufferCache.clear();
+    // Reset deck refs — chains rebuild lazily on next setPlaying call
+    decksRef.current = { a: null, b: null };
+
+    const ctx = globalContext;
     const state0 = ctx.state;
 
-    const doBeep = () => {
-      try {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.frequency.value = 440;
-        g.gain.value = 0.5;
-        osc.connect(g);
-        g.connect(ctx.destination);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.25);
-      } catch (e) {
-        console.error('beep error', e);
-      }
-    };
-
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(doBeep).catch(e => console.error('resume error', e));
-      return `ctx was ${state0} → resuming (beep pending) sr:${ctx.sampleRate}`;
+    // Pre-generate a 0.5 s 880 Hz sine buffer (buffer source is more reliable than OscillatorNode on iOS)
+    const sr = ctx.sampleRate;
+    const frames = Math.ceil(0.5 * sr);
+    const buf = ctx.createBuffer(1, frames, sr);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < frames; i++) {
+      const t = i / sr;
+      const env = Math.min(1, t * 40) * Math.max(0, 1 - t * 2.5);
+      data[i] = Math.sin(2 * Math.PI * 880 * t) * env * 0.9;
     }
 
-    doBeep();
-    return `ctx:${state0} beep fired sr:${ctx.sampleRate}`;
+    const playBeep = () => {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(ctx.currentTime);
+      onStatus?.(`ctx:${ctx.state} beep fired sr:${sr}`);
+    };
+
+    if (ctx.state === 'running') {
+      playBeep();
+      return `ctx:running beep immediate sr:${sr}`;
+    }
+
+    // Suspended — queue source NOW (before resume) so it plays when context unblocks
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+
+    ctx.resume()
+      .then(() => onStatus?.(`ctx:${ctx.state} resumed sr:${sr}`))
+      .catch(e => onStatus?.(`resume error: ${e}`));
+
+    return `ctx was ${state0} → beep queued+resume called sr:${sr}`;
   }, []);
 
   const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number) => {
@@ -240,5 +263,5 @@ export function useAudioEngine() {
     };
   }, []);
 
-  return { setPlaying, setVolume, setEQ, setFilter, setCrossfader, getAnalyserData, initDeck, unlockAudio };
+  return { setPlaying, setVolume, setEQ, setFilter, setCrossfader, getAnalyserData, initDeck, unlockAudio } as const;
 }
