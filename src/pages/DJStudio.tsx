@@ -148,11 +148,11 @@ export function DJStudio() {
   })();
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#070710' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#000000' }}>
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div style={{
-          background: 'radial-gradient(ellipse at 20% 50%, rgba(168,85,247,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 30%, rgba(6,182,212,0.04) 0%, transparent 50%)'
+          background: 'radial-gradient(ellipse at 20% 50%, rgba(204,0,255,0.05) 0%, transparent 50%), radial-gradient(ellipse at 80% 30%, rgba(0,255,255,0.04) 0%, transparent 50%)'
         }} className="absolute inset-0" />
       </div>
 

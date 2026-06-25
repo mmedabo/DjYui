@@ -76,9 +76,9 @@ export function SessionView() {
   }, [activeLessonIndex, lesson.id, isLessonDone]);
 
   return (
-    <div className="min-h-screen" style={{ background: '#0a0a0f' }}>
+    <div className="min-h-screen" style={{ background: '#000000' }}>
       <div className="fixed inset-0 pointer-events-none" style={{
-        background: `radial-gradient(ellipse at 50% 0%, ${color}08 0%, transparent 60%)`
+        background: `radial-gradient(ellipse at 50% 0%, ${color}10 0%, transparent 55%)`
       }} />
 
       {/* Top bar */}

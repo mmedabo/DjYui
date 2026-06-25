@@ -1,232 +1,213 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import type { YUIExpression } from '../../types';
 
 interface Props {
   expression?: YUIExpression;
-  message?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'hero';
   showBubble?: boolean;
+  message?: string;
   floating?: boolean;
 }
 
-const EXPRESSION_COLORS: Record<YUIExpression, string> = {
-  neutral: '#a855f7',
-  excited: '#ec4899',
-  teaching: '#06b6d4',
-  encouraging: '#10b981',
-  celebrating: '#f59e0b',
-  thinking: '#8b5cf6',
+const SIZES = { sm: 72, md: 120, lg: 190, hero: 300 };
+
+const EXPRESSION_CFG: Record<YUIExpression, { glowA: string; glowB: string; duration: number }> = {
+  excited:     { glowA: '#ff00ff', glowB: '#ff1493', duration: 1.5 },
+  celebrating: { glowA: '#ffcc00', glowB: '#ff00ff', duration: 1.2 },
+  teaching:    { glowA: '#00ffff', glowB: '#0066ff', duration: 4   },
+  encouraging: { glowA: '#ff6600', glowB: '#ff00aa', duration: 2.5 },
+  neutral:     { glowA: '#cc00ff', glowB: '#00aaff', duration: 5   },
+  thinking:    { glowA: '#0055ff', glowB: '#cc00ff', duration: 7   },
 };
 
-const EXPRESSION_EMOJIS: Record<YUIExpression, string> = {
-  neutral: '😊',
-  excited: '🤩',
-  teaching: '🎓',
-  encouraging: '💪',
-  celebrating: '🎉',
-  thinking: '🤔',
-};
-
-function YuiSVG({ expression = 'neutral', size = 'md' }: { expression: YUIExpression; size: string }) {
-  const color = EXPRESSION_COLORS[expression];
-  const px = size === 'sm' ? 80 : size === 'lg' ? 160 : 120;
-  const isExcited = expression === 'excited' || expression === 'celebrating';
-  const isThinking = expression === 'thinking';
+export function YUICharacter({
+  expression = 'neutral',
+  size = 'md',
+  showBubble = false,
+  message = '',
+  floating = true,
+}: Props) {
+  const cfg = EXPRESSION_CFG[expression];
+  const dim = SIZES[size];
+  const uid = `yui-${expression}-${size}`;
 
   return (
-    <svg width={px} height={px} viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Glow effect */}
-      <defs>
-        <radialGradient id="yuiGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="headGrad" cx="50%" cy="40%" r="60%">
-          <stop offset="0%" stopColor="#fde8d8" />
-          <stop offset="100%" stopColor="#f5c5a3" />
-        </radialGradient>
-        <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={color} />
-          <stop offset="100%" stopColor={color === '#a855f7' ? '#6d28d9' : color} />
-        </linearGradient>
-      </defs>
-
-      {/* Background glow */}
-      <circle cx="60" cy="75" r="55" fill="url(#yuiGlow)" />
-
-      {/* Body / outfit */}
-      <ellipse cx="60" cy="125" rx="28" ry="20" fill={color} opacity="0.9" />
-      {/* DJ jacket */}
-      <path d="M32 115 Q40 105 50 108 L60 120 L70 108 Q80 105 88 115 L88 140 L32 140Z" fill={color} />
-      {/* Shirt detail */}
-      <path d="M50 108 L60 120 L70 108 L60 125Z" fill="white" opacity="0.3" />
-
-      {/* Headphone band */}
-      <path d="M20 62 Q20 30 60 30 Q100 30 100 62" stroke={color} strokeWidth="5" fill="none" strokeLinecap="round" />
-      {/* Headphone cups */}
-      <ellipse cx="20" cy="65" rx="8" ry="10" fill={color} />
-      <ellipse cx="100" cy="65" rx="8" ry="10" fill={color} />
-      <ellipse cx="20" cy="65" rx="5" ry="7" fill="#1a1a2e" />
-      <ellipse cx="100" cy="65" rx="5" ry="7" fill="#1a1a2e" />
-
-      {/* Hair - side pieces */}
-      <path d="M25 55 Q15 70 18 90 Q22 98 28 95 Q24 78 28 65Z" fill="url(#hairGrad)" />
-      <path d="M95 55 Q105 70 102 90 Q98 98 92 95 Q96 78 92 65Z" fill="url(#hairGrad)" />
-
-      {/* Head */}
-      <ellipse cx="60" cy="65" rx="32" ry="35" fill="url(#headGrad)" />
-
-      {/* Hair top */}
-      <path d="M28 55 Q30 25 60 22 Q90 25 92 55 Q85 35 60 33 Q35 35 28 55Z" fill="url(#hairGrad)" />
-      {/* Hair bangs */}
-      <path d="M32 47 Q40 38 50 42 Q45 50 40 52Z" fill="url(#hairGrad)" />
-      <path d="M88 47 Q80 38 70 42 Q75 50 80 52Z" fill="url(#hairGrad)" />
-      <path d="M48 38 Q60 32 72 38 Q60 46 48 38Z" fill="url(#hairGrad)" />
-
-      {/* Eyes */}
-      {isThinking ? (
-        <>
-          <ellipse cx="48" cy="64" rx="7" ry="5" fill="white" />
-          <ellipse cx="72" cy="64" rx="7" ry="5" fill="white" />
-          <circle cx="49" cy="64" r="3.5" fill="#1a1a2e" />
-          <circle cx="73" cy="64" r="3.5" fill="#1a1a2e" />
-          <circle cx="50" cy="63" r="1.5" fill="white" />
-          <circle cx="74" cy="63" r="1.5" fill="white" />
-          {/* Thinking brow */}
-          <path d="M42 58 Q48 55 54 58" stroke="#8b6548" strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d="M66 58 Q72 55 78 58" stroke="#8b6548" strokeWidth="2" fill="none" strokeLinecap="round" />
-        </>
-      ) : isExcited ? (
-        <>
-          {/* Sparkly excited eyes */}
-          <ellipse cx="48" cy="64" rx="8" ry="8" fill="white" />
-          <ellipse cx="72" cy="64" rx="8" ry="8" fill="white" />
-          <circle cx="48" cy="64" r="5" fill={color} />
-          <circle cx="72" cy="64" r="5" fill={color} />
-          <circle cx="46" cy="62" r="2" fill="white" />
-          <circle cx="70" cy="62" r="2" fill="white" />
-          {/* Stars in eyes */}
-          <text x="44" y="67" fontSize="6" fill="white">★</text>
-          <text x="68" y="67" fontSize="6" fill="white">★</text>
-        </>
-      ) : (
-        <>
-          <ellipse cx="48" cy="64" rx="7" ry="6" fill="white" />
-          <ellipse cx="72" cy="64" rx="7" ry="6" fill="white" />
-          <circle cx="49" cy="65" r="4" fill="#1a1a2e" />
-          <circle cx="73" cy="65" r="4" fill="#1a1a2e" />
-          <circle cx="50" cy="64" r="1.5" fill="white" />
-          <circle cx="74" cy="64" r="1.5" fill="white" />
-          {/* Eyelashes */}
-          <path d="M42 60 Q45 58 48 60" stroke="#3d2314" strokeWidth="1.5" fill="none" />
-          <path d="M66 60 Q69 58 72 60" stroke="#3d2314" strokeWidth="1.5" fill="none" />
-        </>
+    <motion.div
+      className="relative inline-block select-none"
+      animate={floating ? { y: [0, -10, 0] } : {}}
+      transition={floating ? { duration: 3.5, repeat: Infinity, ease: 'easeInOut' } : {}}
+    >
+      {/* Speech Bubble */}
+      {showBubble && message && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="absolute left-1/2 -translate-x-1/2 z-20"
+          style={{ bottom: '100%', marginBottom: 8, minWidth: 180, maxWidth: 260 }}
+        >
+          <div style={{
+            background: 'rgba(0,0,0,0.92)',
+            border: `1px solid ${cfg.glowA}66`,
+            boxShadow: `0 0 16px ${cfg.glowA}40, 0 0 40px ${cfg.glowA}18`,
+            borderRadius: 14,
+            padding: '9px 14px',
+            color: '#fff',
+            fontSize: 11,
+            lineHeight: 1.6,
+            textAlign: 'center',
+          }}>
+            {message}
+          </div>
+          <div style={{
+            position: 'absolute',
+            bottom: -7,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: '7px solid transparent',
+            borderRight: '7px solid transparent',
+            borderTop: `7px solid ${cfg.glowA}66`,
+          }} />
+        </motion.div>
       )}
 
-      {/* Blush */}
-      <ellipse cx="38" cy="73" rx="7" ry="4" fill="#f87171" opacity="0.4" />
-      <ellipse cx="82" cy="73" rx="7" ry="4" fill="#f87171" opacity="0.4" />
-
-      {/* Mouth */}
-      {isExcited ? (
-        <path d="M50 79 Q60 88 70 79" stroke="#8b4513" strokeWidth="2" fill="#ec4899" />
-      ) : isThinking ? (
-        <path d="M52 82 Q60 80 68 82" stroke="#8b4513" strokeWidth="2" fill="none" />
-      ) : expression === 'encouraging' ? (
-        <>
-          <path d="M50 79 Q60 87 70 79" stroke="#8b4513" strokeWidth="2" fill="#f97316" />
-          <path d="M54 79 Q60 84 66 79" fill="#fca5a5" />
-        </>
-      ) : (
-        <path d="M52 80 Q60 86 68 80" stroke="#8b4513" strokeWidth="2" fill="none" />
-      )}
-
-      {/* Nose */}
-      <ellipse cx="60" cy="74" rx="3" ry="2" fill="#f5c5a3" />
-
-      {/* Earrings */}
-      <circle cx="28" cy="72" r="3" fill={color} />
-      <circle cx="92" cy="72" r="3" fill={color} />
-
-      {/* Music note decoration */}
-      {isExcited && (
-        <>
-          <text x="5" y="50" fontSize="12" fill={color} opacity="0.8">♪</text>
-          <text x="100" y="45" fontSize="10" fill={color} opacity="0.6">♫</text>
-          <text x="8" y="90" fontSize="8" fill={color} opacity="0.5">♩</text>
-        </>
-      )}
-
-      {/* Thinking bubble dots */}
-      {isThinking && (
-        <>
-          <circle cx="85" cy="45" r="3" fill={color} opacity="0.4" />
-          <circle cx="93" cy="38" r="5" fill={color} opacity="0.5" />
-          <circle cx="103" cy="28" r="8" fill={color} opacity="0.6" />
-        </>
-      )}
-    </svg>
-  );
-}
-
-export function YUICharacter({ expression = 'neutral', message, size = 'md', showBubble = true, floating = true }: Props) {
-  const [displayMessage, setDisplayMessage] = useState(message);
-  const [bubbleKey, setBubbleKey] = useState(0);
-
-  useEffect(() => {
-    if (message !== displayMessage) {
-      setDisplayMessage(message);
-      setBubbleKey(k => k + 1);
-    }
-  }, [message]);
-
-  return (
-    <div className="relative flex flex-col items-center">
-      {/* Speech bubble */}
-      <AnimatePresence>
-        {showBubble && displayMessage && (
-          <motion.div
-            key={bubbleKey}
-            initial={{ opacity: 0, scale: 0.8, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: 10 }}
-            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-64 z-10"
-          >
-            <div
-              className="relative rounded-2xl p-3 text-sm text-white leading-relaxed shadow-xl"
-              style={{
-                background: 'linear-gradient(135deg, rgba(30,20,60,0.95), rgba(20,10,40,0.95))',
-                border: `1.5px solid ${EXPRESSION_COLORS[expression]}`,
-                boxShadow: `0 0 20px ${EXPRESSION_COLORS[expression]}40`,
-              }}
-            >
-              <span className="mr-1">{EXPRESSION_EMOJIS[expression]}</span>
-              {displayMessage}
-              {/* Bubble tail */}
-              <div
-                className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0"
-                style={{
-                  borderLeft: '8px solid transparent',
-                  borderRight: '8px solid transparent',
-                  borderTop: `8px solid ${EXPRESSION_COLORS[expression]}`,
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Character */}
-      <motion.div
-        animate={floating ? { y: [0, -8, 0] } : {}}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        className="cursor-pointer"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+      {/* Neon Dancer SVG */}
+      <motion.svg
+        width={dim}
+        height={dim * 2}
+        viewBox="0 0 200 400"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ display: 'block' }}
+        animate={{
+          filter: [
+            `drop-shadow(0 0 5px ${cfg.glowA}) drop-shadow(0 0 16px ${cfg.glowA}88)`,
+            `drop-shadow(0 0 8px ${cfg.glowB}) drop-shadow(0 0 24px ${cfg.glowB}88)`,
+            `drop-shadow(0 0 5px ${cfg.glowA}) drop-shadow(0 0 16px ${cfg.glowA}88)`,
+          ],
+        }}
+        transition={{ duration: cfg.duration, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <YuiSVG expression={expression} size={size} />
-      </motion.div>
-    </div>
+        <defs>
+          {/* Rainbow gradient — top (pink/purple) → bottom (cyan/blue) */}
+          <linearGradient id={`grad-${uid}`} x1="0" y1="0" x2="0" y2="400" gradientUnits="userSpaceOnUse">
+            <stop offset="0%"   stopColor="#cc00ff" />
+            <stop offset="12%"  stopColor="#ff1493" />
+            <stop offset="28%"  stopColor="#ff4400" />
+            <stop offset="48%"  stopColor="#ff8800" />
+            <stop offset="64%"  stopColor="#ffcc00" />
+            <stop offset="80%"  stopColor="#00ff88" />
+            <stop offset="90%"  stopColor="#00ffcc" />
+            <stop offset="100%" stopColor="#00aaff" />
+          </linearGradient>
+
+          {/* Combined glow filter: wide bloom + tight glow + crisp line */}
+          <filter id={`glow-${uid}`} x="-40%" y="-20%" width="180%" height="140%" colorInterpolationFilters="sRGB">
+            <feGaussianBlur stdDeviation="2.5" result="b1"/>
+            <feGaussianBlur stdDeviation="6"   result="b2"/>
+            <feMerge>
+              <feMergeNode in="b2"/>
+              <feMergeNode in="b1"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        <g
+          filter={`url(#glow-${uid})`}
+          stroke={`url(#grad-${uid})`}
+          strokeWidth="2.8"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {/* ── HEADPHONES ── */}
+          <path d="M 72,42 Q 72,18 100,16 Q 128,18 128,42" />
+          <ellipse cx="69"  cy="50" rx="10" ry="12" />
+          <ellipse cx="131" cy="50" rx="10" ry="12" />
+          <line x1="69"  y1="62" x2="68"  y2="72" />
+          <line x1="131" y1="62" x2="132" y2="72" />
+
+          {/* ── HEAD ── */}
+          <circle cx="100" cy="66" r="22" />
+
+          {/* Face features */}
+          <path d="M 91,63 Q 93,60 96,63" strokeWidth="1.8" />
+          <path d="M 104,63 Q 107,60 110,63" strokeWidth="1.8" />
+          <path d="M 94,72 Q 100,77 106,72" strokeWidth="1.8" />
+
+          {/* ── HAIR – wild & energetic ── */}
+          <path d="M 84,47 Q 66,32 52,40 Q 42,50 48,64" />
+          <path d="M 80,44 Q 60,26 44,32 Q 36,44 42,58" />
+          <path d="M 88,44 Q 74,28 66,34 Q 59,42 64,54" />
+          <path d="M 116,47 Q 134,32 148,40 Q 158,50 152,64" />
+          <path d="M 120,44 Q 140,26 156,32 Q 164,44 158,58" />
+          <path d="M 112,44 Q 126,28 134,34 Q 141,42 136,54" />
+          <path d="M 93,45 Q 87,28 80,22 Q 75,16 70,18" />
+          <path d="M 107,45 Q 113,28 120,22 Q 125,16 130,18" />
+          <path d="M 100,44 Q 100,27 95,18 Q 92,11 89,9" />
+
+          {/* ── NECK ── */}
+          <line x1="94"  y1="88" x2="93"  y2="100" />
+          <line x1="106" y1="88" x2="107" y2="100" />
+
+          {/* ── SHOULDERS ── */}
+          <path d="M 93,100 Q 74,104 56,112" />
+          <path d="M 107,100 Q 126,104 144,112" />
+
+          {/* ── LEFT ARM (raised, gesture) ── */}
+          <path d="M 56,112 Q 38,108 22,102 Q 14,98 12,90" />
+          <path d="M 12,90 Q 8,84 13,80"  strokeWidth="1.6" />
+          <path d="M 13,90 Q 6,88 9,82"   strokeWidth="1.6" />
+          <path d="M 12,90 Q 8,95 12,98"  strokeWidth="1.6" />
+
+          {/* ── RIGHT ARM (forward / DJ mixing gesture) ── */}
+          <path d="M 144,112 Q 160,120 172,132 Q 178,141 174,152" />
+          <path d="M 174,152 Q 176,158 172,161" strokeWidth="1.6" />
+          <path d="M 173,153 Q 179,157 176,163" strokeWidth="1.6" />
+          <path d="M 175,152 Q 180,148 182,155" strokeWidth="1.6" />
+
+          {/* ── CROP TOP ── */}
+          <path d="M 56,112 Q 100,106 144,112" />
+          <line x1="56"  y1="112" x2="58"  y2="150" />
+          <line x1="144" y1="112" x2="142" y2="150" />
+          <path d="M 58,150 Q 100,158 142,150" />
+
+          {/* ── WAIST ── */}
+          <path d="M 64,162 Q 100,172 136,162" />
+
+          {/* ── HIPS ── */}
+          <path d="M 60,172 Q 100,186 140,172" />
+
+          {/* ── SHORTS ── */}
+          <line x1="60"  y1="172" x2="54"  y2="210" />
+          <line x1="140" y1="172" x2="146" y2="210" />
+          <path d="M 54,210 Q 100,222 146,210" />
+          <line x1="100" y1="186" x2="100" y2="212" strokeWidth="1.8" />
+
+          {/* ── LEGS ── */}
+          <path d="M 69,218 Q 64,248 60,278" />
+          <path d="M 59,274 Q 55,279 59,285" strokeWidth="1.6" />
+          <path d="M 60,278 Q 56,306 58,334" />
+
+          <path d="M 131,218 Q 136,248 140,278" />
+          <path d="M 141,274 Q 145,279 141,285" strokeWidth="1.6" />
+          <path d="M 140,278 Q 144,306 142,334" />
+
+          {/* ── CHUNKY SNEAKERS ── */}
+          <path d="M 55,332 Q 42,336 36,350 Q 36,364 54,363 Q 68,363 74,353 Q 77,341 67,333 Z" />
+          <path d="M 36,362 Q 54,368 76,362" strokeWidth="1.8" />
+          <path d="M 44,350 Q 60,346 72,350" strokeWidth="1.6" />
+
+          <path d="M 145,332 Q 158,336 164,350 Q 164,364 146,363 Q 132,363 126,353 Q 123,341 133,333 Z" />
+          <path d="M 164,362 Q 146,368 124,362" strokeWidth="1.8" />
+          <path d="M 156,350 Q 140,346 128,350" strokeWidth="1.6" />
+
+          {/* ── FLOOR REFLECTION ── */}
+          <path d="M 36,370 Q 100,376 164,370" strokeWidth="1" opacity="0.3" />
+        </g>
+      </motion.svg>
+    </motion.div>
   );
 }

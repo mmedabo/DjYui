@@ -7,7 +7,7 @@
 }
 
 html, body {
-  background: #0a0a0f;
+  background: #000000;
   color: #f0f0f0;
   font-family: 'Inter', system-ui, sans-serif;
   overflow-x: hidden;
@@ -19,7 +19,8 @@ html, body {
   width: 100%;
 }
 
-/* Vinyl record spin animation */
+/* ─────────────── Animations ─────────────── */
+
 @keyframes spin-vinyl {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -27,7 +28,7 @@ html, body {
 
 @keyframes yui-float {
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
+  50% { transform: translateY(-10px); }
 }
 
 @keyframes speak-bubble {
@@ -40,61 +41,125 @@ html, body {
   50% { transform: scaleY(1); }
 }
 
-@keyframes eq-bar {
-  0%, 100% { height: 20%; }
-  50% { height: 100%; }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(168,85,247,0.3); }
-  50% { box-shadow: 0 0 25px rgba(168,85,247,0.7), 0 0 50px rgba(168,85,247,0.3); }
-}
-
 @keyframes shimmer {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
 
-.vinyl-spinning {
-  animation: spin-vinyl 1.8s linear infinite;
-}
-.vinyl-slow {
-  animation: spin-vinyl 3.6s linear infinite;
-}
-.vinyl-paused {
-  animation: spin-vinyl 1.8s linear infinite paused;
-}
-.yui-float {
-  animation: yui-float 3s ease-in-out infinite;
-}
-.speak-bubble {
-  animation: speak-bubble 0.25s ease-out forwards;
-}
-.glow-pulse {
-  animation: glow-pulse 2s ease-in-out infinite;
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.7; }
 }
 
-/* Glass morphism */
+@keyframes neon-pulse-pink {
+  0%, 100% {
+    text-shadow: 0 0 6px #ff1493, 0 0 20px #ff1493, 0 0 40px #ff1493;
+  }
+  50% {
+    text-shadow: 0 0 10px #ff00ff, 0 0 30px #ff00ff, 0 0 60px #ff00ff, 0 0 80px #ff00ff;
+  }
+}
+
+@keyframes neon-pulse-cyan {
+  0%, 100% {
+    text-shadow: 0 0 6px #00ffff, 0 0 20px #00ffff, 0 0 40px #00ffff;
+  }
+  50% {
+    text-shadow: 0 0 10px #00eeee, 0 0 30px #00eeee, 0 0 60px #00eeee;
+  }
+}
+
+@keyframes rainbow-border {
+  0%   { border-color: #ff00ff; box-shadow: 0 0 12px #ff00ff40, inset 0 0 12px #ff00ff08; }
+  25%  { border-color: #ff6600; box-shadow: 0 0 12px #ff660040, inset 0 0 12px #ff660008; }
+  50%  { border-color: #00ffff; box-shadow: 0 0 12px #00ffff40, inset 0 0 12px #00ffff08; }
+  75%  { border-color: #cc00ff; box-shadow: 0 0 12px #cc00ff40, inset 0 0 12px #cc00ff08; }
+  100% { border-color: #ff00ff; box-shadow: 0 0 12px #ff00ff40, inset 0 0 12px #ff00ff08; }
+}
+
+@keyframes particle-rise {
+  0%   { transform: translateY(0) scale(1); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-120px) scale(0.4); opacity: 0; }
+}
+
+@keyframes floor-glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scaleX(1); }
+  50% { opacity: 0.7; transform: scaleX(1.05); }
+}
+
+/* ─────────────── Utility classes ─────────────── */
+
+.vinyl-spinning { animation: spin-vinyl 1.8s linear infinite; }
+.vinyl-slow     { animation: spin-vinyl 3.6s linear infinite; }
+.vinyl-paused   { animation: spin-vinyl 1.8s linear infinite paused; }
+.yui-float      { animation: yui-float 3s ease-in-out infinite; }
+.speak-bubble   { animation: speak-bubble 0.25s ease-out forwards; }
+
+/* Neon text */
+.neon-pink   { color: #ff1493; text-shadow: 0 0 8px #ff1493, 0 0 20px #ff1493, 0 0 40px #ff00ff; animation: neon-pulse-pink 3s ease-in-out infinite; }
+.neon-cyan   { color: #00ffff; text-shadow: 0 0 8px #00ffff, 0 0 20px #00ffff, 0 0 40px #00ddff; animation: neon-pulse-cyan 3s ease-in-out infinite; }
+.neon-purple { color: #cc00ff; text-shadow: 0 0 8px #cc00ff, 0 0 20px #cc00ff, 0 0 40px #9900ff; }
+
+/* Rainbow gradient text */
+.neon-rainbow-text {
+  background: linear-gradient(135deg, #ff00ff 0%, #ff1493 20%, #ff6600 40%, #ffcc00 55%, #00ff80 70%, #00ffff 85%, #0099ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(255,0,255,0.5));
+}
+
+/* Glass panels — dark with neon border glow */
 .glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.glass-dark {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 8, 0.75);
+  backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(204, 0, 255, 0.18);
+  box-shadow: 0 0 20px rgba(204, 0, 255, 0.06), 0 8px 32px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-/* Neon effects */
-.neon-purple { text-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7; }
-.neon-cyan { text-shadow: 0 0 10px #06b6d4, 0 0 20px #06b6d4; }
-.neon-pink { text-shadow: 0 0 10px #ec4899, 0 0 20px #ec4899; }
+.glass-dark {
+  background: rgba(0, 0, 5, 0.88);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 255, 255, 0.12);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.04), 0 8px 32px rgba(0, 0, 0, 0.95);
+}
+
+/* Neon card with animated rainbow border */
+.neon-card {
+  background: rgba(0, 0, 8, 0.8);
+  border: 1px solid #ff00ff;
+  animation: rainbow-border 6s linear infinite;
+  backdrop-filter: blur(12px);
+}
+
+/* Neon border variants */
+.neon-border-pink {
+  border: 1px solid #ff1493;
+  box-shadow: 0 0 10px rgba(255, 20, 147, 0.4), inset 0 0 10px rgba(255, 20, 147, 0.05);
+}
+.neon-border-cyan {
+  border: 1px solid #00ffff;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.4), inset 0 0 10px rgba(0, 255, 255, 0.05);
+}
+.neon-border-purple {
+  border: 1px solid #cc00ff;
+  box-shadow: 0 0 10px rgba(204, 0, 255, 0.4), inset 0 0 10px rgba(204, 0, 255, 0.05);
+}
+
+/* Neon glow box */
+.neon-glow-box {
+  box-shadow: 0 0 15px rgba(255, 0, 255, 0.3), 0 0 30px rgba(255, 0, 255, 0.1), 0 0 60px rgba(255, 0, 255, 0.05);
+}
 
 /* Custom scrollbar */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #111; }
-::-webkit-scrollbar-thumb { background: #a855f7; border-radius: 3px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #050508; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #ff00ff, #00ffff);
+  border-radius: 2px;
+}
 
 /* Range inputs */
 input[type="range"] {
@@ -104,18 +169,19 @@ input[type="range"] {
   cursor: pointer;
 }
 input[type="range"]::-webkit-slider-track {
-  background: #2d2d3a;
+  background: linear-gradient(to right, #1a001a, #0a001a);
   height: 4px;
   border-radius: 2px;
+  border: 1px solid rgba(204, 0, 255, 0.3);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #a855f7;
+  background: #ff1493;
   margin-top: -5px;
-  box-shadow: 0 0 8px rgba(168,85,247,0.7);
+  box-shadow: 0 0 8px #ff1493, 0 0 16px rgba(255, 20, 147, 0.5);
 }
 input[type="range"].vertical {
   writing-mode: vertical-lr;
@@ -126,9 +192,22 @@ input[type="range"].vertical::-webkit-slider-track {
   height: 100%;
 }
 
-/* Progress bar shimmer */
+/* Progress bar — rainbow shimmer */
 .progress-bar {
-  background: linear-gradient(90deg, #a855f7 0%, #ec4899 50%, #a855f7 100%);
+  background: linear-gradient(90deg, #ff00ff 0%, #ff6600 25%, #ffcc00 50%, #00ffff 75%, #ff00ff 100%);
   background-size: 200% auto;
-  animation: shimmer 2s linear infinite;
+  animation: shimmer 2.5s linear infinite;
+}
+
+/* Neon button */
+.btn-neon {
+  background: transparent;
+  border: 1.5px solid #ff1493;
+  color: #ff1493;
+  box-shadow: 0 0 10px rgba(255, 20, 147, 0.4), inset 0 0 10px rgba(255, 20, 147, 0.05);
+  transition: all 0.2s ease;
+}
+.btn-neon:hover {
+  background: rgba(255, 20, 147, 0.1);
+  box-shadow: 0 0 20px rgba(255, 20, 147, 0.7), inset 0 0 20px rgba(255, 20, 147, 0.1);
 }

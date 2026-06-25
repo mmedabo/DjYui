@@ -19,7 +19,7 @@ export default function App() {
   const { currentPage, setPage } = useAppStore();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f' }}>
+    <div style={{ minHeight: '100vh', background: '#000000' }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentPage}

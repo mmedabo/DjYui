@@ -4,243 +4,359 @@ import { YUICharacter } from '../components/YUI/YUICharacter';
 import { useAppStore } from '../store/appStore';
 
 const FEATURES = [
-  { icon: BookOpen, title: '12 Learning Sessions', desc: 'From scratch to pro — step-by-step curriculum designed for real skill building', color: '#a855f7' },
-  { icon: Headphones, title: 'Virtual DJ Studio', desc: 'Interactive turntables, mixer, EQ, and FX — practice anytime, anywhere', color: '#06b6d4' },
-  { icon: Zap, title: 'Live Beat Matching', desc: 'Real-time audio engine with Web Audio API for authentic DJ experience', color: '#f59e0b' },
-  { icon: Star, title: 'Endless Compositions', desc: 'Create, save, and replay your own mixes. Track your creative journey!', color: '#ec4899' },
-  { icon: Trophy, title: 'XP & Progression', desc: 'Earn experience points, unlock sessions, and level up from beginner to pro', color: '#10b981' },
-  { icon: Music, title: 'YUI Tutor AI', desc: 'Your personal DJ tutor guides you with tips, challenges, and encouragement', color: '#8b5cf6' },
+  { icon: BookOpen,   title: '12 Sessions',          desc: 'Beginner to pro curriculum — real skills, real techniques', color: '#cc00ff' },
+  { icon: Headphones, title: 'Virtual DJ Deck',       desc: 'Two turntables, mixer, EQ, FX, scratching — all in browser', color: '#00ffff' },
+  { icon: Zap,        title: 'Live Audio Engine',     desc: 'Real-time beat generation via Web Audio API', color: '#ff6600' },
+  { icon: Star,       title: 'Endless Compositions',  desc: 'Create & save your own mixes. Build your portfolio!', color: '#ff1493' },
+  { icon: Trophy,     title: '20 Achievements',       desc: 'Unlock badges as you master each skill and milestone', color: '#ffcc00' },
+  { icon: Music,      title: 'YUI AI Tutor',          desc: 'Personal DJ tutor with tips, challenges & encouragement', color: '#00ff88' },
+];
+
+// Stable pre-computed particles (no Math.random() on render)
+const PARTICLES = [
+  { color: '#ff00ff', x: 8,  delay: 0,    dur: 4.2 },
+  { color: '#00ffff', x: 16, delay: 0.7,  dur: 3.8 },
+  { color: '#ff6600', x: 24, delay: 1.4,  dur: 4.6 },
+  { color: '#cc00ff', x: 32, delay: 0.3,  dur: 3.5 },
+  { color: '#ffcc00', x: 40, delay: 1.1,  dur: 4.0 },
+  { color: '#00ff88', x: 48, delay: 0.6,  dur: 3.3 },
+  { color: '#ff1493', x: 56, delay: 1.8,  dur: 4.8 },
+  { color: '#00ffff', x: 64, delay: 0.2,  dur: 3.9 },
+  { color: '#ff00ff', x: 72, delay: 1.5,  dur: 4.1 },
+  { color: '#ffcc00', x: 80, delay: 0.9,  dur: 3.6 },
+  { color: '#cc00ff', x: 88, delay: 0.4,  dur: 4.4 },
+  { color: '#ff6600', x: 92, delay: 1.2,  dur: 3.7 },
+  { color: '#00ff88', x: 96, delay: 2.0,  dur: 4.3 },
+  { color: '#ff1493', x: 4,  delay: 1.6,  dur: 3.4 },
+  { color: '#00ffff', x: 20, delay: 2.3,  dur: 4.7 },
+  { color: '#ff00ff', x: 44, delay: 0.1,  dur: 3.2 },
+  { color: '#ffcc00', x: 68, delay: 1.9,  dur: 4.5 },
+  { color: '#cc00ff', x: 84, delay: 0.8,  dur: 3.1 },
+];
+
+const JOURNEY = [
+  { level: 'Beginner',     color: '#10b981', sessions: '1–4',   desc: 'Gear, BPM, first mix'   },
+  { level: 'Intermediate', color: '#f59e0b', sessions: '5–8',   desc: 'EQ, FX, transitions'   },
+  { level: 'Advanced',     color: '#cc00ff', sessions: '9–10',  desc: 'Scratch, live remix'   },
+  { level: 'Pro',          color: '#ff1493', sessions: '11–12', desc: 'Full sets, production' },
 ];
 
 export function Landing() {
   const { setPage } = useAppStore();
 
   return (
-    <div className="min-h-screen overflow-hidden" style={{ background: '#0a0a0f' }}>
-      {/* Animated background */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0" style={{
-          background: 'radial-gradient(ellipse at 20% 50%, rgba(168,85,247,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(6,182,212,0.06) 0%, transparent 60%), radial-gradient(ellipse at 50% 80%, rgba(236,72,153,0.05) 0%, transparent 60%)'
-        }} />
-        {/* Grid lines */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'linear-gradient(rgba(168,85,247,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.04) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }} />
-        {/* Floating particles */}
-        {Array.from({ length: 12 }).map((_, i) => (
+    <div className="min-h-screen overflow-hidden" style={{ background: '#000000' }}>
+
+      {/* ── Neon particle field ── */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {PARTICLES.map((p, i) => (
           <motion.div
             key={i}
             className="absolute rounded-full"
             style={{
-              width: Math.random() * 4 + 2,
-              height: Math.random() * 4 + 2,
-              background: ['#a855f7', '#06b6d4', '#ec4899', '#f59e0b'][i % 4],
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              width: 3,
+              height: 3,
+              background: p.color,
+              boxShadow: `0 0 6px ${p.color}, 0 0 14px ${p.color}`,
+              left: `${p.x}%`,
+              bottom: 0,
             }}
-            animate={{ y: [0, -30, 0], opacity: [0.2, 0.8, 0.2] }}
-            transition={{ duration: 3 + Math.random() * 4, repeat: Infinity, delay: Math.random() * 3 }}
+            animate={{ y: [0, -500], opacity: [0, 1, 1, 0], scale: [0.5, 1.5, 1, 0.3] }}
+            transition={{ duration: p.dur, delay: p.delay, repeat: Infinity, ease: 'easeOut' }}
           />
         ))}
+
+        {/* Subtle neon glow blobs */}
+        <div style={{
+          position: 'absolute', top: '10%', left: '5%', width: 400, height: 400,
+          background: 'radial-gradient(circle, rgba(204,0,255,0.06) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+        }} />
+        <div style={{
+          position: 'absolute', top: '30%', right: '5%', width: 300, height: 300,
+          background: 'radial-gradient(circle, rgba(0,255,255,0.05) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+        }} />
+        <div style={{
+          position: 'absolute', bottom: '10%', left: '30%', width: 500, height: 200,
+          background: 'radial-gradient(ellipse, rgba(255,20,147,0.04) 0%, transparent 70%)',
+          filter: 'blur(30px)',
+        }} />
       </div>
 
-      {/* Header */}
+      {/* ── Nav ── */}
       <header className="relative z-10 flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
-            style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+            style={{
+              background: 'transparent',
+              border: '1.5px solid #ff1493',
+              boxShadow: '0 0 10px rgba(255,20,147,0.5)',
+            }}>
             🎧
           </div>
-          <span className="font-bold text-white">DJ YUI</span>
+          <span className="font-black text-white tracking-wider" style={{
+            textShadow: '0 0 10px rgba(204,0,255,0.8)',
+          }}>DJ YUI</span>
         </div>
         <button
           onClick={() => setPage('dashboard')}
-          className="text-sm text-white/60 hover:text-white transition-colors"
+          className="text-sm transition-colors"
+          style={{ color: 'rgba(255,255,255,0.4)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#00ffff')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
         >
           Skip intro →
         </button>
       </header>
 
-      {/* Hero section */}
-      <main className="relative z-10 flex flex-col items-center px-6 pt-8 pb-20">
-        {/* YUI Introduction */}
+      {/* ── HERO ── */}
+      <main className="relative z-10 flex flex-col items-center px-4 pt-4 pb-20">
+
+        {/* Title */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="flex flex-col lg:flex-row items-center gap-12 max-w-5xl w-full mb-20"
+          transition={{ duration: 0.7 }}
+          className="text-center mb-2"
         >
-          {/* Left: Character */}
-          <div className="flex flex-col items-center">
-            <YUICharacter
-              expression="excited"
-              size="lg"
-              showBubble={true}
-              message="Hey! I'm YUI — your DJ tutor! I'll teach you everything from your first beat to full pro sets! Ready? Let's GO! 🎧"
-              floating={true}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-4"
+            style={{
+              background: 'rgba(255,0,255,0.08)',
+              border: '1px solid rgba(255,0,255,0.3)',
+              color: '#ff00ff',
+              boxShadow: '0 0 12px rgba(255,0,255,0.15)',
+            }}>
+            🎵 From Scratch to Pro DJ
+          </div>
+          <h1 className="text-6xl sm:text-7xl lg:text-8xl font-black leading-none mb-3 neon-rainbow-text">
+            DJ YUI
+          </h1>
+          <p className="text-base sm:text-lg max-w-md mx-auto" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            Your AI-powered DJ tutor. Master the decks, one beat at a time.
+          </p>
+        </motion.div>
+
+        {/* Large neon dancer hero */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.9, ease: 'easeOut' }}
+          className="relative flex items-center justify-center my-2"
+        >
+          {/* Floor glow beneath character */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 280,
+            height: 40,
+            background: 'radial-gradient(ellipse, rgba(255,0,255,0.35) 0%, rgba(0,255,255,0.15) 40%, transparent 70%)',
+            filter: 'blur(12px)',
+            animation: 'floor-glow-pulse 3s ease-in-out infinite',
+          }} />
+
+          <YUICharacter
+            expression="excited"
+            size="hero"
+            showBubble={true}
+            message="Hey! I'm YUI — your DJ tutor! Ready to drop some beats? 🎧"
+            floating={true}
+          />
+
+          {/* Side neon sparks */}
+          {[
+            { side: 'left',  top: '20%', color: '#ff00ff', w: 40 },
+            { side: 'left',  top: '55%', color: '#ff6600', w: 25 },
+            { side: 'right', top: '30%', color: '#00ffff', w: 35 },
+            { side: 'right', top: '65%', color: '#ffcc00', w: 20 },
+          ].map((spark, i) => (
+            <motion.div
+              key={i}
+              style={{
+                position: 'absolute',
+                top: spark.top,
+                [spark.side]: spark.side === 'left' ? -20 : -20,
+                width: spark.w,
+                height: 2,
+                background: spark.color,
+                boxShadow: `0 0 8px ${spark.color}, 0 0 20px ${spark.color}`,
+                borderRadius: 2,
+              }}
+              animate={{ opacity: [0, 1, 0], scaleX: [0, 1, 0] }}
+              transition={{ duration: 1.5, delay: i * 0.4, repeat: Infinity }}
             />
-          </div>
+          ))}
+        </motion.div>
 
-          {/* Right: Hero text */}
-          <div className="flex flex-col gap-6 text-center lg:text-left">
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3, duration: 0.8 }}
-            >
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4"
-                style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7' }}>
-                🎵 From Scratch to Pro
-              </div>
-              <h1 className="text-5xl lg:text-6xl font-black text-white leading-none mb-4">
-                Learn{' '}
-                <span className="neon-purple" style={{ color: '#a855f7' }}>DJing</span>
-                <br />with{' '}
-                <span className="neon-pink" style={{ color: '#ec4899' }}>YUI</span>
-              </h1>
-              <p className="text-lg text-white/60 leading-relaxed max-w-lg">
-                Your personal AI DJ tutor. Master beatmatching, EQ, effects, scratching, and full set building — one session at a time.
-              </p>
-            </motion.div>
+        {/* Stats row */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.6 }}
+          className="flex gap-8 justify-center mb-8"
+        >
+          {[
+            { value: '12',  label: 'Sessions',     color: '#cc00ff' },
+            { value: '50+', label: 'Lessons',      color: '#00ffff' },
+            { value: '20',  label: 'Achievements', color: '#ff1493' },
+            { value: '∞',   label: 'Mixes',        color: '#ffcc00' },
+          ].map(s => (
+            <div key={s.label} className="text-center">
+              <div className="text-2xl font-black" style={{
+                color: s.color,
+                textShadow: `0 0 10px ${s.color}, 0 0 20px ${s.color}`,
+              }}>{s.value}</div>
+              <div className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.3)' }}>{s.label}</div>
+            </div>
+          ))}
+        </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
-              className="flex flex-col sm:flex-row gap-3"
-            >
-              <button
-                onClick={() => setPage('dashboard')}
-                className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-white text-lg transition-all hover:scale-105 active:scale-95"
-                style={{
-                  background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-                  boxShadow: '0 8px 30px rgba(168,85,247,0.4)',
-                }}
-              >
-                Start Learning Free
-                <ChevronRight size={20} />
-              </button>
-              <button
-                onClick={() => setPage('studio')}
-                className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-white/70 text-lg transition-all hover:text-white glass"
-              >
-                🎛️ Open Studio
-              </button>
-            </motion.div>
-
-            {/* Stats */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.9 }}
-              className="flex gap-6 justify-center lg:justify-start"
-            >
-              {[
-                { value: '12', label: 'Sessions' },
-                { value: '50+', label: 'Lessons' },
-                { value: '∞', label: 'Compositions' },
-              ].map(stat => (
-                <div key={stat.label} className="text-center">
-                  <div className="text-2xl font-black text-white neon-purple" style={{ color: '#a855f7' }}>{stat.value}</div>
-                  <div className="text-xs text-white/40 uppercase tracking-wider">{stat.label}</div>
-                </div>
-              ))}
-            </motion.div>
-          </div>
+        {/* CTA Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.6 }}
+          className="flex flex-col sm:flex-row gap-4 mb-16"
+        >
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setPage('dashboard')}
+            className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-black text-lg transition-all"
+            style={{
+              background: 'linear-gradient(135deg, #ff00ff, #ff1493, #ff6600)',
+              boxShadow: '0 0 20px rgba(255,0,255,0.6), 0 0 50px rgba(255,0,255,0.3)',
+            }}
+          >
+            Start Learning Free
+            <ChevronRight size={20} />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => setPage('studio')}
+            className="flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-lg transition-all btn-neon"
+          >
+            🎛️ Open Studio
+          </motion.button>
         </motion.div>
 
         {/* Feature grid */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8, duration: 0.8 }}
-          className="w-full max-w-5xl"
+          transition={{ delay: 0.9, duration: 0.8 }}
+          className="w-full max-w-4xl mb-16"
         >
-          <h2 className="text-center text-2xl font-bold text-white mb-8">
+          <h2 className="text-center text-xl font-bold mb-6" style={{ color: 'rgba(255,255,255,0.6)' }}>
             Everything you need to become a{' '}
-            <span style={{ color: '#a855f7' }}>pro DJ</span>
+            <span className="neon-rainbow-text font-black">pro DJ</span>
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {FEATURES.map((f, i) => (
               <motion.div
                 key={f.title}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.9 + i * 0.1 }}
-                className="glass rounded-2xl p-5 hover:border-white/15 transition-all group cursor-pointer"
+                transition={{ delay: 1.0 + i * 0.08 }}
+                whileHover={{ scale: 1.03, y: -2 }}
+                className="rounded-2xl p-4 cursor-pointer transition-all group"
+                style={{
+                  background: 'rgba(0,0,8,0.8)',
+                  border: `1px solid ${f.color}30`,
+                  boxShadow: `0 0 15px ${f.color}10`,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = `${f.color}70`; e.currentTarget.style.boxShadow = `0 0 25px ${f.color}25`; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = `${f.color}30`; e.currentTarget.style.boxShadow = `0 0 15px ${f.color}10`; }}
                 onClick={() => setPage('dashboard')}
               >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
-                  style={{ background: `${f.color}22` }}
-                >
-                  <f.icon size={20} style={{ color: f.color }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+                  style={{ background: `${f.color}18`, boxShadow: `0 0 10px ${f.color}30` }}>
+                  <f.icon size={20} style={{ color: f.color, filter: `drop-shadow(0 0 4px ${f.color})` }} />
                 </div>
-                <h3 className="font-bold text-white mb-1.5">{f.title}</h3>
-                <p className="text-sm text-white/50 leading-relaxed">{f.desc}</p>
+                <h3 className="font-bold text-white mb-1 text-sm">{f.title}</h3>
+                <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.4)' }}>{f.desc}</p>
               </motion.div>
             ))}
           </div>
         </motion.div>
 
-        {/* Level path preview */}
+        {/* DJ Journey path */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2 }}
-          className="w-full max-w-3xl mt-20"
+          transition={{ delay: 1.3 }}
+          className="w-full max-w-3xl mb-16"
         >
-          <h2 className="text-center text-2xl font-bold text-white mb-8">Your DJ journey</h2>
+          <h2 className="text-center text-xl font-bold mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            Your DJ journey
+          </h2>
           <div className="flex items-center justify-between">
-            {[
-              { level: 'Beginner', color: '#10b981', sessions: '1-4', desc: 'Gear, BPM, first mix' },
-              { level: 'Intermediate', color: '#f59e0b', sessions: '5-8', desc: 'EQ, FX, transitions' },
-              { level: 'Advanced', color: '#a855f7', sessions: '9-10', desc: 'Scratch, live remix' },
-              { level: 'Pro', color: '#ec4899', sessions: '11-12', desc: 'Full sets, production' },
-            ].map((stage, i, arr) => (
-              <div key={stage.level} className="flex items-center">
-                <div className="flex flex-col items-center gap-2">
-                  <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-white text-xs text-center leading-tight"
-                    style={{ background: `${stage.color}22`, border: `2px solid ${stage.color}`, color: stage.color }}
+            {JOURNEY.map((stage, i, arr) => (
+              <div key={stage.level} className="flex items-center flex-1">
+                <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                  <motion.div
+                    animate={{ boxShadow: [`0 0 12px ${stage.color}60`, `0 0 24px ${stage.color}90`, `0 0 12px ${stage.color}60`] }}
+                    transition={{ duration: 2 + i * 0.5, repeat: Infinity }}
+                    className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-xs text-center leading-tight"
+                    style={{
+                      background: `${stage.color}18`,
+                      border: `2px solid ${stage.color}`,
+                      color: stage.color,
+                    }}
                   >
                     {stage.sessions}
-                  </div>
+                  </motion.div>
                   <div className="text-center">
                     <div className="text-xs font-semibold text-white">{stage.level}</div>
-                    <div className="text-xs text-white/30">{stage.desc}</div>
+                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{stage.desc}</div>
                   </div>
                 </div>
                 {i < arr.length - 1 && (
-                  <div className="flex-1 mx-2 h-px bg-gradient-to-r from-current to-transparent"
-                    style={{ color: stage.color }} />
+                  <div className="flex-1 h-px mx-2" style={{
+                    background: `linear-gradient(to right, ${stage.color}, ${arr[i+1].color})`,
+                    boxShadow: `0 0 6px ${stage.color}50`,
+                    opacity: 0.6,
+                  }} />
                 )}
               </div>
             ))}
           </div>
         </motion.div>
 
-        {/* CTA */}
+        {/* Final CTA */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-          className="mt-20 text-center"
+          transition={{ delay: 1.6 }}
+          className="text-center"
         >
-          <button
+          <motion.button
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => setPage('dashboard')}
-            className="px-10 py-5 rounded-2xl font-black text-xl text-white transition-all hover:scale-105 active:scale-95"
-            style={{
-              background: 'linear-gradient(135deg, #a855f7, #ec4899, #06b6d4)',
-              backgroundSize: '200% auto',
-              animation: 'shimmer 3s linear infinite',
-              boxShadow: '0 10px 40px rgba(168,85,247,0.5)',
+            className="px-10 py-5 rounded-2xl font-black text-xl text-black transition-all"
+            animate={{
+              boxShadow: [
+                '0 0 20px rgba(255,0,255,0.6), 0 0 50px rgba(255,0,255,0.3)',
+                '0 0 30px rgba(0,255,255,0.6), 0 0 60px rgba(0,255,255,0.3)',
+                '0 0 20px rgba(255,0,255,0.6), 0 0 50px rgba(255,0,255,0.3)',
+              ],
+              background: [
+                'linear-gradient(135deg, #ff00ff, #ff6600, #ffcc00)',
+                'linear-gradient(135deg, #00ffff, #cc00ff, #ff1493)',
+                'linear-gradient(135deg, #ff00ff, #ff6600, #ffcc00)',
+              ],
             }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           >
             Begin Your DJ Journey 🎧
-          </button>
-          <p className="text-white/30 text-sm mt-3">Free forever • No registration required • Learn at your own pace</p>
+          </motion.button>
+          <p className="mt-3 text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>
+            Free forever · No signup required · Learn at your pace
+          </p>
         </motion.div>
       </main>
     </div>

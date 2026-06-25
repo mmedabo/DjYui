@@ -45,10 +45,10 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: '#0a0a0f' }}>
-      {/* Background gradient */}
+    <div className="min-h-screen" style={{ background: '#000000' }}>
+      {/* Background neon glow */}
       <div className="fixed inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(ellipse at 30% 20%, rgba(168,85,247,0.06) 0%, transparent 60%)'
+        background: 'radial-gradient(ellipse at 30% 20%, rgba(204,0,255,0.05) 0%, transparent 55%), radial-gradient(ellipse at 80% 80%, rgba(0,255,255,0.03) 0%, transparent 55%)'
       }} />
 
       {/* Top nav */}
