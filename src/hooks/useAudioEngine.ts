@@ -7,6 +7,7 @@ interface DeckAudio {
   eqHigh: BiquadFilterNode;
   filter: BiquadFilterNode;
   analyser: AnalyserNode;
+  audioEl: HTMLAudioElement;
   sourceNode: AudioScheduledSourceNode | null;
   playing: boolean;
   bpm: number;
@@ -44,14 +45,12 @@ function generateBeatBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
     const bs = Math.round(beat * beatSec * sr);
     const hs = Math.round((beat + 0.5) * beatSec * sr);
 
-    // Kick on 1 & 3
     if (beat === 0 || beat === 2) {
       add(bs, 0.25, i => {
         const t = i / sr;
         return Math.sin(2 * Math.PI * 80 * Math.exp(-t * 30) * t) * Math.exp(-t * 20) * 0.9;
       });
     }
-    // Snare on 2 & 4
     if (beat === 1 || beat === 3) {
       add(bs, 0.18, i => {
         const t = i / sr;
@@ -62,10 +61,8 @@ function generateBeatBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
         return Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t * 30) * 0.3;
       });
     }
-    // Hi-hat every beat + offbeat
     add(bs, 0.04, i => (Math.random() * 2 - 1) * Math.exp(-i / sr * 80) * 0.25);
     add(hs, 0.03, i => (Math.random() * 2 - 1) * Math.exp(-i / sr * 100) * 0.18);
-    // Bass on 1 & 3
     if (beat === 0 || beat === 2) {
       const f = beat === 0 ? 55 : 49;
       add(bs, 0.4, i => {
@@ -105,14 +102,21 @@ function buildChain(ctx: AudioContext): Omit<DeckAudio, 'playing' | 'bpm' | 'sou
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 256;
 
+  // Route Web Audio through MediaStreamDestination → HTMLAudioElement.
+  // iOS Chrome (WKWebView) silences ctx.destination but allows HTMLAudioElement
+  // playback triggered by a user gesture (the Play button tap).
+  const streamDest = ctx.createMediaStreamDestination();
+  const audioEl = new Audio();
+  audioEl.srcObject = streamDest.stream;
+
   gainNode.connect(eqLow);
   eqLow.connect(eqMid);
   eqMid.connect(eqHigh);
   eqHigh.connect(filter);
   filter.connect(analyser);
-  analyser.connect(ctx.destination);
+  analyser.connect(streamDest);
 
-  return { gainNode, eqLow, eqMid, eqHigh, filter, analyser };
+  return { gainNode, eqLow, eqMid, eqHigh, filter, analyser, audioEl };
 }
 
 export function useAudioEngine() {
@@ -127,58 +131,25 @@ export function useAudioEngine() {
 
   const getDeck = useCallback((id: 'a' | 'b') => decksRef.current[id] ?? initDeck(id), [initDeck]);
 
-  // Call inside a user tap to unlock iOS audio.
-  // Recreates the AudioContext fresh inside the gesture so iOS 14.5+ starts it as 'running'.
-  // Returns a debug string; calls onStatus again after the resume promise resolves.
+  // Call inside a user gesture to pre-unlock both deck audio elements.
+  // Returns a debug string. onStatus fires again after async operations settle.
   const unlockAudio = useCallback((onStatus?: (s: string) => void): string => {
-    // Always tear down and recreate so the new context is born inside this gesture
-    if (globalContext && globalContext.state !== 'closed') {
-      try { globalContext.close(); } catch (_) {}
-    }
-    globalContext = new AudioContext();
-    bufferCache.clear();
-    // Reset deck refs — chains rebuild lazily on next setPlaying call
-    decksRef.current = { a: null, b: null };
-
-    const ctx = globalContext;
+    const ctx = getOrCreateContext();
     const state0 = ctx.state;
 
-    // Pre-generate a 0.5 s 880 Hz sine buffer (buffer source is more reliable than OscillatorNode on iOS)
-    const sr = ctx.sampleRate;
-    const frames = Math.ceil(0.5 * sr);
-    const buf = ctx.createBuffer(1, frames, sr);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < frames; i++) {
-      const t = i / sr;
-      const env = Math.min(1, t * 40) * Math.max(0, 1 - t * 2.5);
-      data[i] = Math.sin(2 * Math.PI * 880 * t) * env * 0.9;
-    }
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
-    const playBeep = () => {
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start(ctx.currentTime);
-      onStatus?.(`ctx:${ctx.state} beep fired sr:${sr}`);
-    };
+    // Pre-initialize both decks so their audioEls exist, then play them silently
+    // to satisfy the iOS "audio element must be started in a user gesture" rule.
+    const da = initDeck('a');
+    const db = initDeck('b');
 
-    if (ctx.state === 'running') {
-      playBeep();
-      return `ctx:running beep immediate sr:${sr}`;
-    }
+    Promise.all([da.audioEl.play(), db.audioEl.play()])
+      .then(() => onStatus?.(`audioEl OK ctx:${ctx.state} sr:${ctx.sampleRate}`))
+      .catch(e => onStatus?.(`audioEl error: ${e}`));
 
-    // Suspended — queue source NOW (before resume) so it plays when context unblocks
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    src.start(0);
-
-    ctx.resume()
-      .then(() => onStatus?.(`ctx:${ctx.state} resumed sr:${sr}`))
-      .catch(e => onStatus?.(`resume error: ${e}`));
-
-    return `ctx was ${state0} → beep queued+resume called sr:${sr}`;
-  }, []);
+    return `ctx was ${state0}, audioEl.play() called sr:${ctx.sampleRate}`;
+  }, [initDeck]);
 
   const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number) => {
     const ctx = getOrCreateContext();
@@ -186,7 +157,6 @@ export function useAudioEngine() {
     deck.playing = playing;
     deck.bpm = bpm;
 
-    // Stop current source
     if (deck.sourceNode) {
       try { deck.sourceNode.stop(0); } catch (_) {}
       deck.sourceNode.disconnect();
@@ -195,11 +165,12 @@ export function useAudioEngine() {
 
     if (!playing) {
       deck.gainNode.gain.value = 0;
+      deck.audioEl.pause();
       return;
     }
 
     const startSource = () => {
-      if (!deck.playing) return; // user stopped before resume resolved
+      if (!deck.playing) return;
       const buf = getCachedBuffer(ctx, bpm);
       const source = ctx.createBufferSource();
       source.buffer = buf;
@@ -209,6 +180,11 @@ export function useAudioEngine() {
       source.start(ctx.currentTime);
       deck.sourceNode = source;
     };
+
+    // audioEl.play() must be called in the user gesture stack (setPlaying IS called from onClick)
+    if (deck.audioEl.paused) {
+      deck.audioEl.play().catch(e => console.error('audioEl play error', e));
+    }
 
     if (ctx.state === 'suspended') {
       ctx.resume().then(startSource).catch(e => console.error('resume error', e));
@@ -259,6 +235,7 @@ export function useAudioEngine() {
       [decksRef.current.a, decksRef.current.b].forEach(d => {
         if (!d) return;
         try { d.sourceNode?.stop(0); } catch (_) {}
+        try { d.audioEl.pause(); } catch (_) {}
       });
     };
   }, []);
