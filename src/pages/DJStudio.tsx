@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Save, Volume2, Headphones } from 'lucide-react';
+import { ChevronLeft, Save, Volume2, Headphones, Trophy } from 'lucide-react';
 import { Turntable } from '../components/DJDeck/Turntable';
 import { Mixer } from '../components/DJDeck/Mixer';
-import { Waveform } from '../components/DJDeck/Waveform';
+import { AudioVisualizer } from '../components/DJDeck/AudioVisualizer';
 import { TrackSelector } from '../components/DJDeck/TrackSelector';
 import { YUICharacter } from '../components/YUI/YUICharacter';
 import { useAppStore } from '../store/appStore';
@@ -18,11 +18,12 @@ const YUI_TIPS = [
   { msg: "Pitch fader adjusts tempo. Double-click a knob to reset it to center! 🎵", expr: 'neutral' },
   { msg: "Hot cues (1-4) let you jump to marked positions instantly! 🎯", expr: 'excited' },
   { msg: "Try using reverb for smooth track exits! Let it wash out beautifully! ✨", expr: 'excited' },
-  { msg: "Loading different BPM tracks? Use the pitch fader to match them! 💪", expr: 'encouraging' },
+  { msg: "Loading different BPM tracks? Use SYNC to match their tempo! 💪", expr: 'encouraging' },
+  { msg: "Hit RECORD then mix freely — save your session as a composition! 🎤", expr: 'teaching' },
 ];
 
 export function DJStudio() {
-  const { deckA, deckB, mixer, updateDeckA, updateDeckB, setPage, addComposition } = useAppStore();
+  const { deckA, deckB, mixer, updateDeckA, updateDeckB, setPage, addComposition, incrementStat } = useAppStore();
   const audio = useAudioEngine();
 
   const [yuiTipIdx, setYuiTipIdx] = useState(0);
@@ -57,16 +58,22 @@ export function DJStudio() {
     updateDeckA({ isPlaying: playing });
     const track = TRACKS.find(t => t.id === deckA.trackId);
     audio.setPlaying('a', playing, track?.bpm || deckA.bpm);
-    if (playing) audio.setCrossfader(mixer.crossfader);
-  }, [deckA.trackId, deckA.bpm, mixer.crossfader, audio, updateDeckA]);
+    if (playing) {
+      audio.setCrossfader(mixer.crossfader);
+      incrementStat('deckAPlays');
+    }
+  }, [deckA.trackId, deckA.bpm, mixer.crossfader, audio, updateDeckA, incrementStat]);
 
   const handlePlayB = useCallback((playing: boolean) => {
     setAudioStarted(true);
     updateDeckB({ isPlaying: playing });
     const track = TRACKS.find(t => t.id === deckB.trackId);
     audio.setPlaying('b', playing, track?.bpm || deckB.bpm);
-    if (playing) audio.setCrossfader(mixer.crossfader);
-  }, [deckB.trackId, deckB.bpm, mixer.crossfader, audio, updateDeckB]);
+    if (playing) {
+      audio.setCrossfader(mixer.crossfader);
+      incrementStat('deckBPlays');
+    }
+  }, [deckB.trackId, deckB.bpm, mixer.crossfader, audio, updateDeckB, incrementStat]);
 
   const handleCrossfader = useCallback((v: number) => {
     audio.setCrossfader(v);
@@ -83,6 +90,26 @@ export function DJStudio() {
     updateDeckB({ trackId, bpm: track.bpm, isPlaying: false, position: 0 });
     audio.setPlaying('b', false, track.bpm);
   };
+
+  // Sync deck B BPM to deck A
+  const handleSyncBtoA = useCallback(() => {
+    const trackA = TRACKS.find(t => t.id === deckA.trackId);
+    const targetBpm = trackA?.bpm || deckA.bpm;
+    const trackB = TRACKS.find(t => t.id === deckB.trackId);
+    const baseBpmB = trackB?.bpm || deckB.bpm;
+    const newPitch = (targetBpm - baseBpmB) / (baseBpmB * 0.08);
+    updateDeckB({ pitch: Math.max(-1, Math.min(1, newPitch)) });
+  }, [deckA.trackId, deckA.bpm, deckB.trackId, deckB.bpm, updateDeckB]);
+
+  // Sync deck A BPM to deck B
+  const handleSyncAtoB = useCallback(() => {
+    const trackB = TRACKS.find(t => t.id === deckB.trackId);
+    const targetBpm = trackB?.bpm || deckB.bpm;
+    const trackA = TRACKS.find(t => t.id === deckA.trackId);
+    const baseBpmA = trackA?.bpm || deckA.bpm;
+    const newPitch = (targetBpm - baseBpmA) / (baseBpmA * 0.08);
+    updateDeckA({ pitch: Math.max(-1, Math.min(1, newPitch)) });
+  }, [deckA.trackId, deckA.bpm, deckB.trackId, deckB.bpm, updateDeckA]);
 
   const handleSaveMix = () => {
     if (!mixName.trim()) return;
@@ -109,6 +136,16 @@ export function DJStudio() {
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
   const currentTip = YUI_TIPS[yuiTipIdx];
+
+  const bpmA = (() => {
+    const t = TRACKS.find(t => t.id === deckA.trackId);
+    return Math.round((t?.bpm || deckA.bpm) * (1 + deckA.pitch * 0.08));
+  })();
+
+  const bpmB = (() => {
+    const t = TRACKS.find(t => t.id === deckB.trackId);
+    return Math.round((t?.bpm || deckB.bpm) * (1 + deckB.pitch * 0.08));
+  })();
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#070710' }}>
@@ -144,7 +181,17 @@ export function DJStudio() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => { setIsRecording(r => !r); if (isRecording && recordingTime > 0) setShowSaveModal(true); }}
+            onClick={() => setPage('achievements')}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold glass text-white/60 hover:text-white transition-colors flex items-center gap-1"
+          >
+            <Trophy size={11} className="text-yellow-400" /> Achievements
+          </button>
+          <button
+            onClick={() => {
+              const wasRecording = isRecording;
+              setIsRecording(r => !r);
+              if (wasRecording && recordingTime > 0) setShowSaveModal(true);
+            }}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
             style={isRecording
               ? { background: '#ef444420', border: '1px solid #ef4444', color: '#ef4444' }
@@ -166,20 +213,23 @@ export function DJStudio() {
 
       {/* Main studio layout */}
       <div className="relative z-10 flex flex-col gap-4 p-4 flex-1">
-        {/* Waveforms */}
+        {/* Visualizers */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="glass rounded-2xl p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Deck A</span>
-              {deckA.trackId && (
-                <span className="text-xs text-white/30 font-mono">{TRACKS.find(t=>t.id===deckA.trackId)?.bpm} BPM</span>
-              )}
+              <div className="flex items-center gap-3">
+                {deckA.trackId && (
+                  <span className="text-xs text-white/30 font-mono">{bpmA} BPM</span>
+                )}
+              </div>
             </div>
-            <Waveform
-              trackId={deckA.trackId}
-              position={deckA.position}
+            <AudioVisualizer
+              getAnalyserData={() => audio.getAnalyserData('a')}
               isPlaying={deckA.isPlaying}
               color="#a855f7"
+              height={48}
+              style="bars"
             />
             <div className="mt-2">
               <TrackSelector deck="A" currentTrackId={deckA.trackId} onSelect={handleSelectTrackA} />
@@ -188,15 +238,23 @@ export function DJStudio() {
           <div className="glass rounded-2xl p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Deck B</span>
-              {deckB.trackId && (
-                <span className="text-xs text-white/30 font-mono">{TRACKS.find(t=>t.id===deckB.trackId)?.bpm} BPM</span>
-              )}
+              <div className="flex items-center gap-3">
+                {deckB.trackId && (
+                  <span className="text-xs text-white/30 font-mono">{bpmB} BPM</span>
+                )}
+                {deckA.trackId && deckB.trackId && bpmA !== bpmB && (
+                  <span className="text-xs text-yellow-400/70 font-mono">
+                    Δ {Math.abs(bpmA - bpmB)} BPM
+                  </span>
+                )}
+              </div>
             </div>
-            <Waveform
-              trackId={deckB.trackId}
-              position={deckB.position}
+            <AudioVisualizer
+              getAnalyserData={() => audio.getAnalyserData('b')}
               isPlaying={deckB.isPlaying}
               color="#06b6d4"
+              height={48}
+              style="bars"
             />
             <div className="mt-2">
               <TrackSelector deck="B" currentTrackId={deckB.trackId} onSelect={handleSelectTrackB} />
@@ -214,6 +272,8 @@ export function DJStudio() {
               onUpdate={updateDeckA}
               onPlay={handlePlayA}
               onCue={() => updateDeckA({ position: 0, isPlaying: false })}
+              onSync={handleSyncAtoB}
+              syncBpm={bpmB}
             />
           </div>
 
@@ -230,6 +290,8 @@ export function DJStudio() {
               onUpdate={updateDeckB}
               onPlay={handlePlayB}
               onCue={() => updateDeckB({ position: 0, isPlaying: false })}
+              onSync={handleSyncBtoA}
+              syncBpm={bpmA}
             />
           </div>
         </div>

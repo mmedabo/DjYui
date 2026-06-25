@@ -5,6 +5,7 @@ import { SessionView } from './pages/SessionView';
 import { DJStudio } from './pages/DJStudio';
 import { Compositions } from './pages/Compositions';
 import { YUIPanel } from './components/YUI/YUIPanel';
+import { AchievementsPanel } from './components/Achievements/AchievementsPanel';
 import { useAppStore } from './store/appStore';
 import './index.css';
 
@@ -15,7 +16,7 @@ const pageVariants = {
 };
 
 export default function App() {
-  const { currentPage } = useAppStore();
+  const { currentPage, setPage } = useAppStore();
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f' }}>
@@ -33,11 +34,14 @@ export default function App() {
           {currentPage === 'session' && <SessionView />}
           {currentPage === 'studio' && <DJStudio />}
           {currentPage === 'compositions' && <Compositions />}
+          {currentPage === 'achievements' && (
+            <AchievementsPanel onClose={() => setPage('dashboard')} />
+          )}
         </motion.div>
       </AnimatePresence>
 
-      {/* YUI persistent panel on all pages except landing */}
-      {currentPage !== 'landing' && currentPage !== 'studio' && <YUIPanel />}
+      {/* YUI persistent panel on all pages except landing, studio, and achievements */}
+      {currentPage !== 'landing' && currentPage !== 'studio' && currentPage !== 'achievements' && <YUIPanel />}
     </div>
   );
 }

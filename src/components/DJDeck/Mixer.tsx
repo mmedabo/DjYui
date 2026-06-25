@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Knob } from './Knob';
 import { useAppStore } from '../../store/appStore';
 
@@ -6,12 +7,27 @@ interface Props {
 }
 
 export function Mixer({ onCrossfaderChange }: Props) {
-  const { deckA, deckB, mixer, updateDeckA, updateDeckB, updateMixer } = useAppStore();
+  const { deckA, deckB, mixer, updateDeckA, updateDeckB, updateMixer, incrementStat } = useAppStore();
+  const lastEqRef = useRef(0);
+  const lastCfRef = useRef(0);
 
   const handleCrossfader = (v: number) => {
     const norm = (v + 1) / 2; // -1..1 → 0..1
     updateMixer({ crossfader: norm });
     onCrossfaderChange?.(norm);
+    const now = Date.now();
+    if (now - lastCfRef.current > 800) {
+      incrementStat('crossfaderMoves');
+      lastCfRef.current = now;
+    }
+  };
+
+  const trackEq = () => {
+    const now = Date.now();
+    if (now - lastEqRef.current > 800) {
+      incrementStat('eqAdjustments');
+      lastEqRef.current = now;
+    }
   };
 
   return (
@@ -28,17 +44,17 @@ export function Mixer({ onCrossfaderChange }: Props) {
         <div className="flex justify-around">
           <Knob
             value={deckA.eqHigh} min={-1} max={1}
-            onChange={v => updateDeckA({ eqHigh: v })}
+            onChange={v => { updateDeckA({ eqHigh: v }); trackEq(); }}
             label="HIGH" color="#06b6d4" size={44}
           />
           <Knob
             value={deckA.eqMid} min={-1} max={1}
-            onChange={v => updateDeckA({ eqMid: v })}
+            onChange={v => { updateDeckA({ eqMid: v }); trackEq(); }}
             label="MID" color="#a855f7" size={44}
           />
           <Knob
             value={deckA.eqLow} min={-1} max={1}
-            onChange={v => updateDeckA({ eqLow: v })}
+            onChange={v => { updateDeckA({ eqLow: v }); trackEq(); }}
             label="LOW" color="#ec4899" size={44}
           />
         </div>
@@ -88,17 +104,17 @@ export function Mixer({ onCrossfaderChange }: Props) {
         <div className="flex justify-around">
           <Knob
             value={deckB.eqHigh} min={-1} max={1}
-            onChange={v => updateDeckB({ eqHigh: v })}
+            onChange={v => { updateDeckB({ eqHigh: v }); trackEq(); }}
             label="HIGH" color="#06b6d4" size={44}
           />
           <Knob
             value={deckB.eqMid} min={-1} max={1}
-            onChange={v => updateDeckB({ eqMid: v })}
+            onChange={v => { updateDeckB({ eqMid: v }); trackEq(); }}
             label="MID" color="#a855f7" size={44}
           />
           <Knob
             value={deckB.eqLow} min={-1} max={1}
-            onChange={v => updateDeckB({ eqLow: v })}
+            onChange={v => { updateDeckB({ eqLow: v }); trackEq(); }}
             label="LOW" color="#ec4899" size={44}
           />
         </div>

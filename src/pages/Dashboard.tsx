@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ChevronRight, Lock, CheckCircle, Star, Zap, Music, BookOpen, Play } from 'lucide-react';
+import { ChevronRight, Lock, CheckCircle, Star, Zap, Music, BookOpen, Play, Trophy } from 'lucide-react';
 import { YUICharacter } from '../components/YUI/YUICharacter';
 import { useAppStore } from '../store/appStore';
 import { SESSIONS } from '../data/sessions';
@@ -63,7 +63,7 @@ export function Dashboard() {
           </div>
           <span className="font-bold text-white text-sm">DJ YUI</span>
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button onClick={() => setPage('studio')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold glass text-white/70 hover:text-white transition-colors">
             <Music size={12} /> Studio
@@ -71,6 +71,10 @@ export function Dashboard() {
           <button onClick={() => setPage('compositions')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold glass text-white/70 hover:text-white transition-colors">
             <Play size={12} /> Mixes
+          </button>
+          <button onClick={() => setPage('achievements')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold glass text-white/70 hover:text-white transition-colors">
+            <Trophy size={12} className="text-yellow-400" /> Achievements
           </button>
         </div>
       </nav>
@@ -148,7 +152,7 @@ export function Dashboard() {
           {[
             { icon: '🎛️', label: 'Open Studio', action: () => setPage('studio'), color: '#a855f7' },
             { icon: '📼', label: 'My Mixes', action: () => setPage('compositions'), color: '#06b6d4' },
-            { icon: '🏆', label: `${totalXP} XP`, action: () => {}, color: '#f59e0b' },
+            { icon: '🏆', label: `${totalXP} XP`, action: () => setPage('achievements'), color: '#f59e0b' },
           ].map(item => (
             <motion.button
               key={item.label}

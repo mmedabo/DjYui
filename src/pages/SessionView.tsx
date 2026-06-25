@@ -73,7 +73,7 @@ export function SessionView() {
     setYuiDialogIdx(0);
     setLessonComplete(isLessonDone);
     setShowChallenge(false);
-  }, [activeLessonIndex, lesson.id]);
+  }, [activeLessonIndex, lesson.id, isLessonDone]);
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0a0f' }}>

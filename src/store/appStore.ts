@@ -2,9 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AppProgress, DeckState, MixerState, Composition } from '../types';
 
+export interface StudioStats {
+  deckAPlays: number;
+  deckBPlays: number;
+  crossfaderMoves: number;
+  eqAdjustments: number;
+  scratchCount: number;
+}
+
 interface AppStore {
   // Navigation
-  currentPage: 'landing' | 'dashboard' | 'session' | 'studio' | 'compositions';
+  currentPage: 'landing' | 'dashboard' | 'session' | 'studio' | 'compositions' | 'achievements';
   activeSessionId: number | null;
   activeLessonIndex: number;
   setPage: (page: AppStore['currentPage']) => void;
@@ -43,6 +51,14 @@ interface AppStore {
   // Completed lessons tracking
   completedLessons: string[];
   markLessonComplete: (lessonId: string) => void;
+
+  // Studio stats (for achievements)
+  studioStats: StudioStats;
+  incrementStat: (stat: keyof StudioStats, by?: number) => void;
+
+  // Unlocked achievements
+  unlockedAchievements: string[];
+  unlockAchievement: (id: string) => void;
 }
 
 const defaultDeck = (): DeckState => ({
@@ -61,6 +77,14 @@ const defaultDeck = (): DeckState => ({
   loopEnd: 0.25,
   position: 0,
   cues: [],
+});
+
+const defaultStats = (): StudioStats => ({
+  deckAPlays: 0,
+  deckBPlays: 0,
+  crossfaderMoves: 0,
+  eqAdjustments: 0,
+  scratchCount: 0,
 });
 
 export const useAppStore = create<AppStore>()(
@@ -83,10 +107,14 @@ export const useAppStore = create<AppStore>()(
         compositions: [],
       },
 
-      completeLesson: (_sessionId, _lessonId) => {
+      completeLesson: (sessionId, lessonId) => {
         set((s) => ({
           progress: { ...s.progress, totalXP: s.progress.totalXP + 50 },
+          completedLessons: s.completedLessons.includes(lessonId)
+            ? s.completedLessons
+            : [...s.completedLessons, lessonId],
         }));
+        void sessionId;
       },
 
       completeSession: (sessionId) => {
@@ -94,8 +122,7 @@ export const useAppStore = create<AppStore>()(
           const already = s.progress.completedSessions.includes(sessionId);
           if (already) return s;
           const completedSessions = [...s.progress.completedSessions, sessionId];
-          const xpBonus = 200;
-          const totalXP = s.progress.totalXP + xpBonus;
+          const totalXP = s.progress.totalXP + 200;
           let level: AppProgress['level'] = 'beginner';
           if (totalXP >= 5000) level = 'pro';
           else if (totalXP >= 2000) level = 'advanced';
@@ -113,7 +140,14 @@ export const useAppStore = create<AppStore>()(
       },
 
       addXP: (amount) => {
-        set((s) => ({ progress: { ...s.progress, totalXP: s.progress.totalXP + amount } }));
+        set((s) => {
+          const totalXP = s.progress.totalXP + amount;
+          let level: AppProgress['level'] = 'beginner';
+          if (totalXP >= 5000) level = 'pro';
+          else if (totalXP >= 2000) level = 'advanced';
+          else if (totalXP >= 800) level = 'intermediate';
+          return { progress: { ...s.progress, totalXP, level } };
+        });
       },
 
       deckA: defaultDeck(),
@@ -132,27 +166,20 @@ export const useAppStore = create<AppStore>()(
 
       addComposition: (comp) => {
         set((s) => ({
-          progress: {
-            ...s.progress,
-            compositions: [comp, ...s.progress.compositions],
-          },
+          progress: { ...s.progress, compositions: [comp, ...s.progress.compositions] },
         }));
       },
 
       removeComposition: (id) => {
         set((s) => ({
-          progress: {
-            ...s.progress,
-            compositions: s.progress.compositions.filter((c) => c.id !== id),
-          },
+          progress: { ...s.progress, compositions: s.progress.compositions.filter(c => c.id !== id) },
         }));
       },
 
       yuiMessage: "Hey! I'm YUI, your DJ tutor! Ready to learn? 🎧",
       yuiExpression: 'excited',
       yuiVisible: true,
-      setYUIMessage: (msg, expression = 'teaching') =>
-        set({ yuiMessage: msg, yuiExpression: expression }),
+      setYUIMessage: (msg, expression = 'teaching') => set({ yuiMessage: msg, yuiExpression: expression }),
       setYUIVisible: (v) => set({ yuiVisible: v }),
 
       completedLessons: [],
@@ -162,12 +189,26 @@ export const useAppStore = create<AppStore>()(
             ? s.completedLessons
             : [...s.completedLessons, lessonId],
         })),
+
+      studioStats: defaultStats(),
+      incrementStat: (stat, by = 1) =>
+        set((s) => ({ studioStats: { ...s.studioStats, [stat]: s.studioStats[stat] + by } })),
+
+      unlockedAchievements: [],
+      unlockAchievement: (id) =>
+        set((s) => ({
+          unlockedAchievements: s.unlockedAchievements.includes(id)
+            ? s.unlockedAchievements
+            : [...s.unlockedAchievements, id],
+        })),
     }),
     {
-      name: 'djyui-app',
+      name: 'djyui-app-v2',
       partialize: (s) => ({
         progress: s.progress,
         completedLessons: s.completedLessons,
+        studioStats: s.studioStats,
+        unlockedAchievements: s.unlockedAchievements,
       }),
     }
   )
