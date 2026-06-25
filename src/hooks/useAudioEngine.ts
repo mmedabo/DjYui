@@ -115,7 +115,8 @@ export function useAudioEngine() {
     return 'unlocking audio elements…';
   }, [getDeck]);
 
-  const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number) => {
+  // customUrl: pass a blob/object URL for uploaded files; omit to use generated beat
+  const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number, customUrl?: string) => {
     const deck = getDeck(deckId);
     deck.playing = playing;
     deck.bpm = bpm;
@@ -125,7 +126,7 @@ export function useAudioEngine() {
       return;
     }
 
-    const url = getBeatBlobUrl(bpm);
+    const url = customUrl ?? getBeatBlobUrl(bpm);
     if (deck.audioEl.src !== url) {
       deck.audioEl.src = url;
     }

@@ -12,11 +12,12 @@ interface Props {
   onCue: () => void;
   onSync?: () => void;
   syncBpm?: number;
+  customTrackName?: string;
 }
 
 const CUE_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#06b6d4'];
 
-export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBpm }: Props) {
+export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBpm, customTrackName }: Props) {
   const track = TRACKS.find(t => t.id === state.trackId);
   const isDragging = useRef(false);
   const dragStartAngle = useRef(0);
@@ -127,21 +128,19 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
       {/* Track info */}
       <div className="text-center w-full">
         <div className="text-xs text-white/30 uppercase tracking-widest mb-1">DECK {deck}</div>
-        {track ? (
+        {(track || customTrackName) ? (
           <>
-            <div className="font-bold text-white text-sm leading-tight truncate">{track.name}</div>
-            <div className="text-xs text-white/40 truncate">{track.artist}</div>
+            <div className="font-bold text-white text-sm leading-tight truncate">{customTrackName ?? track?.name}</div>
+            <div className="text-xs text-white/40 truncate">{customTrackName ? 'Your upload' : track?.artist}</div>
             <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-mono font-bold"
-                style={{ background: color + '22', border: `1px solid ${color}44`, color }}
-              >
+              <span className="text-xs px-2 py-0.5 rounded-full font-mono font-bold"
+                style={{ background: color + '22', border: `1px solid ${color}44`, color }}>
                 {actualBpm} BPM
               </span>
-              <span className="text-xs rounded px-1.5 py-0.5" style={{ background: '#1a1a2e', color: 'rgba(255,255,255,0.5)' }}>
-                {track.key}
-              </span>
-              <span className="text-xs text-white/30">{track.genre}</span>
+              {track && <>
+                <span className="text-xs rounded px-1.5 py-0.5" style={{ background: '#1a1a2e', color: 'rgba(255,255,255,0.5)' }}>{track.key}</span>
+                <span className="text-xs text-white/30">{track.genre}</span>
+              </>}
             </div>
           </>
         ) : (
