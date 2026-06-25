@@ -13,6 +13,7 @@ interface DeckAudio {
 }
 
 let globalContext: AudioContext | null = null;
+const bufferCache = new Map<number, AudioBuffer>();
 
 function getAudioContext(): AudioContext {
   if (!globalContext || globalContext.state === 'closed') {
@@ -21,7 +22,6 @@ function getAudioContext(): AudioContext {
   return globalContext;
 }
 
-// Build a one-bar beat loop as raw PCM samples — no scheduling needed, works reliably on iOS
 function generateBeatBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
   const sr = ctx.sampleRate;
   const beatSec = 60 / bpm;
@@ -31,61 +31,60 @@ function generateBeatBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
   const L = buf.getChannelData(0);
   const R = buf.getChannelData(1);
 
-  const write = (startSample: number, durationSamples: number, fn: (t: number, env: number) => number) => {
-    for (let i = 0; i < durationSamples; i++) {
-      const idx = startSample + i;
+  const write = (start: number, durSec: number, fn: (t: number, env: number) => number) => {
+    const n = Math.ceil(durSec * sr);
+    const decay = 1 / durSec;
+    for (let i = 0; i < n; i++) {
+      const idx = start + i;
       if (idx >= len) break;
       const t = i / sr;
-      const env = Math.exp(-t * (durationSamples / sr < 0.05 ? 80 : 18));
+      const env = Math.exp(-t * decay * 5);
       const v = fn(t, env);
       L[idx] = Math.max(-1, Math.min(1, (L[idx] || 0) + v));
-      R[idx] = Math.max(-1, Math.min(1, (R[idx] || 0) + v));
+      R[idx] = L[idx];
     }
   };
 
   for (let beat = 0; beat < 4; beat++) {
-    const beatStart = Math.round(beat * beatSec * sr);
-    const halfStart = Math.round((beat + 0.5) * beatSec * sr);
+    const bs = Math.round(beat * beatSec * sr);
+    const hs = Math.round((beat + 0.5) * beatSec * sr);
 
-    // Kick on beats 0 and 2 (1 and 3)
     if (beat === 0 || beat === 2) {
-      write(beatStart, Math.ceil(0.25 * sr), (t, env) =>
-        Math.sin(2 * Math.PI * (80 * Math.exp(-t * 25)) * t) * env * 0.9
+      // Kick: pitch-swept sine
+      write(bs, 0.22, (t, env) =>
+        Math.sin(2 * Math.PI * (90 * Math.exp(-t * 28)) * t) * env * 0.9
       );
     }
 
-    // Snare on beats 1 and 3 (2 and 4)
     if (beat === 1 || beat === 3) {
-      // noise component
-      write(beatStart, Math.ceil(0.18 * sr), (_t, env) =>
-        (Math.random() * 2 - 1) * env * 0.55
-      );
-      // tonal body
-      write(beatStart, Math.ceil(0.12 * sr), (t, env) =>
-        Math.sin(2 * Math.PI * 185 * t) * env * 0.3
-      );
+      // Snare: noise + tone
+      write(bs, 0.16, (_t, env) => (Math.random() * 2 - 1) * env * 0.5);
+      write(bs, 0.10, (t, env) => Math.sin(2 * Math.PI * 190 * t) * env * 0.3);
     }
 
-    // Hi-hat on every beat (short noise burst)
-    write(beatStart, Math.ceil(0.04 * sr), (_t, env) =>
-      (Math.random() * 2 - 1) * env * 0.25
-    );
-    // Off-beat hi-hat
-    write(halfStart, Math.ceil(0.03 * sr), (_t, env) =>
-      (Math.random() * 2 - 1) * env * 0.18
-    );
+    // Hi-hat on every beat + off-beat
+    write(bs, 0.04, (_t, env) => (Math.random() * 2 - 1) * env * 0.22);
+    write(hs, 0.03, (_t, env) => (Math.random() * 2 - 1) * env * 0.15);
 
-    // Bass line (beats 0 and 2, lower note on 2)
+    // Bass on beats 1 and 3
     if (beat === 0 || beat === 2) {
       const freq = beat === 0 ? 55 : 49;
-      write(beatStart, Math.ceil(0.35 * sr), (t, env) =>
-        (Math.sin(2 * Math.PI * freq * t) * 0.6 +
-         Math.sin(2 * Math.PI * freq * 2 * t) * 0.15) * env * 0.5
+      write(bs, 0.38, (t, env) =>
+        (Math.sin(2 * Math.PI * freq * t) * 0.7 +
+         Math.sin(2 * Math.PI * freq * 2 * t) * 0.15) * env * 0.45
       );
     }
   }
 
   return buf;
+}
+
+function getCachedBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
+  const key = Math.round(bpm);
+  if (!bufferCache.has(key)) {
+    bufferCache.set(key, generateBeatBuffer(ctx, bpm));
+  }
+  return bufferCache.get(key)!;
 }
 
 function createDeckChain(ctx: AudioContext): Omit<DeckAudio, 'playing' | 'bpm' | 'sourceNode'> {
@@ -137,6 +136,30 @@ export function useAudioEngine() {
     return decksRef.current[deckId] ?? initDeck(deckId);
   }, [initDeck]);
 
+  // Call this directly inside a user tap handler to unlock iOS audio
+  const unlockAudio = useCallback(() => {
+    const ctx = getAudioContext();
+    const warm = () => {
+      // Pre-generate buffers for common BPMs while context is running
+      [118, 120, 122, 124, 126, 128, 130, 132, 134, 140, 142, 145, 148, 170, 174, 176].forEach(b => {
+        getCachedBuffer(ctx, b);
+      });
+      // Play a silent blip to confirm audio pipeline is open
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      g.gain.value = 0.001;
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.01);
+    };
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(warm);
+    } else {
+      warm();
+    }
+  }, []);
+
   const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number) => {
     const ctx = getAudioContext();
     const deck = getDeck(deckId);
@@ -144,22 +167,20 @@ export function useAudioEngine() {
     deck.bpm = bpm;
 
     const doPlay = () => {
-      // Stop existing source
       if (deck.sourceNode) {
         try { deck.sourceNode.stop(); } catch (_) {}
         deck.sourceNode.disconnect();
         deck.sourceNode = null;
       }
-
       if (playing) {
-        const buf = generateBeatBuffer(ctx, bpm);
+        const buf = getCachedBuffer(ctx, bpm);
         const source = ctx.createBufferSource();
         source.buffer = buf;
         source.loop = true;
         source.connect(deck.gainNode);
         source.start(0);
         deck.sourceNode = source;
-        deck.gainNode.gain.setTargetAtTime(0.8, ctx.currentTime, 0.05);
+        deck.gainNode.gain.setTargetAtTime(0.85, ctx.currentTime, 0.04);
       } else {
         deck.gainNode.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
       }
@@ -176,16 +197,16 @@ export function useAudioEngine() {
     const ctx = getAudioContext();
     const deck = getDeck(deckId);
     if (deck.playing) {
-      deck.gainNode.gain.setTargetAtTime(volume * 0.8, ctx.currentTime, 0.05);
+      deck.gainNode.gain.setTargetAtTime(volume * 0.85, ctx.currentTime, 0.05);
     }
   }, [getDeck]);
 
   const setEQ = useCallback((deckId: 'a' | 'b', band: 'low' | 'mid' | 'high', value: number) => {
     const deck = getDeck(deckId);
-    const gain = value * 12;
-    if (band === 'low') deck.eqLow.gain.value = gain;
-    if (band === 'mid') deck.eqMid.gain.value = gain;
-    if (band === 'high') deck.eqHigh.gain.value = gain;
+    const g = value * 12;
+    if (band === 'low') deck.eqLow.gain.value = g;
+    if (band === 'mid') deck.eqMid.gain.value = g;
+    if (band === 'high') deck.eqHigh.gain.value = g;
   }, [getDeck]);
 
   const setFilter = useCallback((deckId: 'a' | 'b', value: number) => {
@@ -197,12 +218,12 @@ export function useAudioEngine() {
 
   const setCrossfader = useCallback((value: number) => {
     const ctx = getAudioContext();
-    const deckA = decksRef.current.a;
-    const deckB = decksRef.current.b;
-    if (!deckA || !deckB) return;
-    const angleA = value * Math.PI * 0.5;
-    if (deckA.playing) deckA.gainNode.gain.setTargetAtTime(Math.cos(angleA) * 0.8, ctx.currentTime, 0.02);
-    if (deckB.playing) deckB.gainNode.gain.setTargetAtTime(Math.sin(angleA) * 0.8, ctx.currentTime, 0.02);
+    const a = decksRef.current.a;
+    const b = decksRef.current.b;
+    if (!a || !b) return;
+    const angle = value * Math.PI * 0.5;
+    if (a.playing) a.gainNode.gain.setTargetAtTime(Math.cos(angle) * 0.85, ctx.currentTime, 0.02);
+    if (b.playing) b.gainNode.gain.setTargetAtTime(Math.sin(angle) * 0.85, ctx.currentTime, 0.02);
   }, []);
 
   const getAnalyserData = useCallback((deckId: 'a' | 'b'): Uint8Array => {
@@ -215,14 +236,11 @@ export function useAudioEngine() {
 
   useEffect(() => {
     return () => {
-      const stop = (d: DeckAudio | null) => {
-        if (!d) return;
-        if (d.sourceNode) { try { d.sourceNode.stop(); } catch (_) {} }
-      };
-      stop(decksRef.current.a);
-      stop(decksRef.current.b);
+      [decksRef.current.a, decksRef.current.b].forEach(d => {
+        if (d?.sourceNode) { try { d.sourceNode.stop(); } catch (_) {} }
+      });
     };
   }, []);
 
-  return { setPlaying, setVolume, setEQ, setFilter, setCrossfader, getAnalyserData, initDeck };
+  return { setPlaying, setVolume, setEQ, setFilter, setCrossfader, getAnalyserData, initDeck, unlockAudio };
 }

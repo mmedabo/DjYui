@@ -318,29 +318,25 @@ export function DJStudio() {
           </button>
         </motion.div>
 
-        {/* Audio not started notice */}
+        {/* Audio not started notice — tapping this unlocks iOS audio */}
         {!audioStarted && (
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             onClick={() => {
-              // iOS requires explicit user gesture to unlock AudioContext
-              try {
-                const ctx = new AudioContext();
-                ctx.resume().then(() => ctx.close());
-              } catch (_) {}
+              audio.unlockAudio();
               setAudioStarted(true);
             }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-2xl text-sm z-50 active:scale-95 transition-all"
             style={{
-              background: 'linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.2))',
-              border: '1px solid rgba(168,85,247,0.5)',
-              color: 'rgba(255,255,255,0.8)',
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.5), rgba(236,72,153,0.4))',
+              border: '1.5px solid rgba(168,85,247,0.9)',
+              color: '#fff',
               boxShadow: '0 0 20px rgba(168,85,247,0.3)',
             }}
           >
-            <Volume2 size={14} className="text-purple-400" />
-            Tap here then press Play to start audio
+            <Volume2 size={16} className="text-purple-300" />
+            <span className="font-bold">Tap to enable audio, then press ▶ Play</span>
           </motion.button>
         )}
       </div>
