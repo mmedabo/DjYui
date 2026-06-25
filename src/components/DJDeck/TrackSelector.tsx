@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Music, Search, Upload, X, ChevronDown } from 'lucide-react';
+import { useId } from 'react';
 import { TRACKS } from '../../data/tracks';
 
 const GENRES = ['All', ...Array.from(new Set(TRACKS.map(t => t.genre)))];
@@ -18,7 +19,7 @@ export function TrackSelector({ deck, currentTrackId, currentTrackName, onSelect
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [genre, setGenre] = useState('All');
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
   const deckColor = deck === 'A' ? '#a855f7' : '#06b6d4';
 
   const currentTrack = TRACKS.find(t => t.id === currentTrackId);
@@ -40,7 +41,8 @@ export function TrackSelector({ deck, currentTrackId, currentTrackName, onSelect
     const name = file.name.replace(/\.[^.]+$/, '');
     onUpload?.(url, name);
     setOpen(false);
-    e.target.value = '';
+    // Reset so the same file can be re-selected
+    setTimeout(() => { e.target.value = ''; }, 100);
   };
 
   const close = () => { setOpen(false); setSearch(''); setGenre('All'); };
@@ -69,9 +71,6 @@ export function TrackSelector({ deck, currentTrackId, currentTrackName, onSelect
         </div>
         <ChevronDown size={12} className="text-white/40 shrink-0" />
       </button>
-
-      {/* Hidden file input */}
-      <input ref={fileRef} type="file" accept="audio/*" className="hidden" onChange={handleFileChange} />
 
       {/* Bottom-sheet modal */}
       {createPortal(
@@ -123,9 +122,9 @@ export function TrackSelector({ deck, currentTrackId, currentTrackName, onSelect
 
                 {/* Upload from device */}
                 <div className="px-4 pt-4 pb-2">
-                  <button
-                    onClick={() => fileRef.current?.click()}
-                    className="flex items-center gap-4 w-full px-4 py-4 rounded-2xl transition-all active:scale-95"
+                  <label
+                    htmlFor={fileInputId}
+                    className="flex items-center gap-4 w-full px-4 py-4 rounded-2xl transition-all active:scale-95 cursor-pointer"
                     style={{
                       background: `${deckColor}12`,
                       border: `1.5px dashed ${deckColor}60`,
@@ -139,7 +138,14 @@ export function TrackSelector({ deck, currentTrackId, currentTrackName, onSelect
                       <div className="text-sm font-bold text-white">Upload from your device</div>
                       <div className="text-xs text-white/40 mt-0.5">MP3, AAC, WAV, M4A, FLAC…</div>
                     </div>
-                  </button>
+                    <input
+                      id={fileInputId}
+                      type="file"
+                      accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,audio/*"
+                      className="sr-only"
+                      onChange={handleFileChange}
+                    />
+                  </label>
                 </div>
 
                 {/* Divider */}
