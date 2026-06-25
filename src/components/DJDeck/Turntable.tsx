@@ -20,7 +20,6 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
   const track = TRACKS.find(t => t.id === state.trackId);
   const isDragging = useRef(false);
   const dragStartAngle = useRef(0);
-  const dragStartPos = useRef({ x: 0, y: 0 });
   const [angle, setAngle] = useState(0);
   const animRef = useRef<number | undefined>(undefined);
   const vinylRef = useRef<HTMLDivElement>(null);
@@ -63,26 +62,44 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
     isDragging.current = true;
     const rect = vinylRef.current.getBoundingClientRect();
     dragStartAngle.current = angle;
-    dragStartPos.current = { x: e.clientX, y: e.clientY };
-
     const startEventAngle = getAngleFromEvent(e.clientX, e.clientY, rect);
 
     const onMove = (me: MouseEvent) => {
       if (!isDragging.current || !vinylRef.current) return;
       const r = vinylRef.current.getBoundingClientRect();
-      const currentEventAngle = getAngleFromEvent(me.clientX, me.clientY, r);
-      const diff = currentEventAngle - startEventAngle;
+      const diff = getAngleFromEvent(me.clientX, me.clientY, r) - startEventAngle;
       setAngle((dragStartAngle.current + diff) % 360);
     };
-
     const onUp = () => {
       isDragging.current = false;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+  }, [angle, getAngleFromEvent]);
+
+  const onVinylTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!vinylRef.current || e.touches.length === 0) return;
+    isDragging.current = true;
+    const rect = vinylRef.current.getBoundingClientRect();
+    dragStartAngle.current = angle;
+    const startEventAngle = getAngleFromEvent(e.touches[0].clientX, e.touches[0].clientY, rect);
+
+    const onMove = (te: TouchEvent) => {
+      if (!isDragging.current || !vinylRef.current || te.touches.length === 0) return;
+      te.preventDefault();
+      const r = vinylRef.current.getBoundingClientRect();
+      const diff = getAngleFromEvent(te.touches[0].clientX, te.touches[0].clientY, r) - startEventAngle;
+      setAngle((dragStartAngle.current + diff) % 360);
+    };
+    const onUp = () => {
+      isDragging.current = false;
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
   }, [angle, getAngleFromEvent]);
 
   // Hot cue handlers
@@ -149,6 +166,7 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
           className="absolute inset-2 rounded-full cursor-grab active:cursor-grabbing"
           style={{ transform: `rotate(${angle}deg)` }}
           onMouseDown={onVinylMouseDown}
+          onTouchStart={onVinylTouchStart}
         >
           <svg viewBox="0 0 160 160" className="w-full h-full">
             <defs>

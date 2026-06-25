@@ -187,30 +187,36 @@ export function useAudioEngine() {
 
   const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number) => {
     const ctx = getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume();
-
     const deck = getDeck(deckId);
     deck.playing = playing;
     deck.bpm = bpm;
 
-    if (playing) {
-      deck.gainNode.gain.setTargetAtTime(0.7, ctx.currentTime, 0.1);
-
-      if (deck.beatInterval) clearInterval(deck.beatInterval);
-      const beatMs = (60 / bpm) * 4 * 1000;
-      const scheduleNext = () => {
-        if (deck.playing) {
-          scheduleBeat(ctx, deck.gainNode, deck.bpm, ctx.currentTime + 0.05);
+    const doPlay = () => {
+      if (playing) {
+        deck.gainNode.gain.setTargetAtTime(0.7, ctx.currentTime, 0.1);
+        if (deck.beatInterval) clearInterval(deck.beatInterval);
+        const beatMs = (60 / bpm) * 4 * 1000;
+        const scheduleNext = () => {
+          if (deck.playing) {
+            scheduleBeat(ctx, deck.gainNode, deck.bpm, ctx.currentTime + 0.05);
+          }
+        };
+        scheduleNext();
+        deck.beatInterval = setInterval(scheduleNext, beatMs) as any;
+      } else {
+        deck.gainNode.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+        if (deck.beatInterval) {
+          clearInterval(deck.beatInterval);
+          deck.beatInterval = null;
         }
-      };
-      scheduleNext();
-      deck.beatInterval = setInterval(scheduleNext, beatMs) as any;
-    } else {
-      deck.gainNode.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
-      if (deck.beatInterval) {
-        clearInterval(deck.beatInterval);
-        deck.beatInterval = null;
       }
+    };
+
+    // iOS Safari requires awaiting resume() before scheduling audio
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(doPlay);
+    } else {
+      doPlay();
     }
   }, [getDeck]);
 

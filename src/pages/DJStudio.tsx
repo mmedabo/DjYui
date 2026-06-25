@@ -320,14 +320,28 @@ export function DJStudio() {
 
         {/* Audio not started notice */}
         {!audioStarted && (
-          <motion.div
+          <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-3 rounded-2xl glass-dark text-sm text-white/60 z-50"
+            onClick={() => {
+              // iOS requires explicit user gesture to unlock AudioContext
+              try {
+                const ctx = new AudioContext();
+                ctx.resume().then(() => ctx.close());
+              } catch (_) {}
+              setAudioStarted(true);
+            }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-2xl text-sm z-50 active:scale-95 transition-all"
+            style={{
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.2))',
+              border: '1px solid rgba(168,85,247,0.5)',
+              color: 'rgba(255,255,255,0.8)',
+              boxShadow: '0 0 20px rgba(168,85,247,0.3)',
+            }}
           >
             <Volume2 size={14} className="text-purple-400" />
-            Click Play on either deck to start the audio engine
-          </motion.div>
+            Tap here then press Play to start audio
+          </motion.button>
         )}
       </div>
 
