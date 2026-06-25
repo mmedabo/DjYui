@@ -7,7 +7,7 @@ interface DeckAudio {
   eqHigh: BiquadFilterNode;
   filter: BiquadFilterNode;
   analyser: AnalyserNode;
-  sourceNode: AudioBufferSourceNode | null;
+  sourceNode: AudioScheduledSourceNode | null;
   playing: boolean;
   bpm: number;
 }
@@ -15,7 +15,7 @@ interface DeckAudio {
 let globalContext: AudioContext | null = null;
 const bufferCache = new Map<number, AudioBuffer>();
 
-function getAudioContext(): AudioContext {
+function getOrCreateContext(): AudioContext {
   if (!globalContext || globalContext.state === 'closed') {
     globalContext = new AudioContext();
   }
@@ -25,22 +25,17 @@ function getAudioContext(): AudioContext {
 function generateBeatBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
   const sr = ctx.sampleRate;
   const beatSec = 60 / bpm;
-  const barSec = beatSec * 4;
-  const len = Math.ceil(barSec * sr);
+  const len = Math.ceil(beatSec * 4 * sr);
   const buf = ctx.createBuffer(2, len, sr);
   const L = buf.getChannelData(0);
   const R = buf.getChannelData(1);
 
-  const write = (start: number, durSec: number, fn: (t: number, env: number) => number) => {
-    const n = Math.ceil(durSec * sr);
-    const decay = 1 / durSec;
+  const add = (startSmp: number, durSec: number, sample: (i: number) => number) => {
+    const n = Math.min(Math.ceil(durSec * sr), len - startSmp);
     for (let i = 0; i < n; i++) {
-      const idx = start + i;
-      if (idx >= len) break;
-      const t = i / sr;
-      const env = Math.exp(-t * decay * 5);
-      const v = fn(t, env);
-      L[idx] = Math.max(-1, Math.min(1, (L[idx] || 0) + v));
+      const v = sample(i);
+      const idx = startSmp + i;
+      L[idx] = Math.max(-1, Math.min(1, (L[idx] ?? 0) + v));
       R[idx] = L[idx];
     }
   };
@@ -49,33 +44,37 @@ function generateBeatBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
     const bs = Math.round(beat * beatSec * sr);
     const hs = Math.round((beat + 0.5) * beatSec * sr);
 
+    // Kick on 1 & 3
     if (beat === 0 || beat === 2) {
-      // Kick: pitch-swept sine
-      write(bs, 0.22, (t, env) =>
-        Math.sin(2 * Math.PI * (90 * Math.exp(-t * 28)) * t) * env * 0.9
-      );
+      add(bs, 0.25, i => {
+        const t = i / sr;
+        return Math.sin(2 * Math.PI * 80 * Math.exp(-t * 30) * t) * Math.exp(-t * 20) * 0.9;
+      });
     }
-
+    // Snare on 2 & 4
     if (beat === 1 || beat === 3) {
-      // Snare: noise + tone
-      write(bs, 0.16, (_t, env) => (Math.random() * 2 - 1) * env * 0.5);
-      write(bs, 0.10, (t, env) => Math.sin(2 * Math.PI * 190 * t) * env * 0.3);
+      add(bs, 0.18, i => {
+        const t = i / sr;
+        return (Math.random() * 2 - 1) * Math.exp(-t * 28) * 0.6;
+      });
+      add(bs, 0.10, i => {
+        const t = i / sr;
+        return Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t * 30) * 0.3;
+      });
     }
-
-    // Hi-hat on every beat + off-beat
-    write(bs, 0.04, (_t, env) => (Math.random() * 2 - 1) * env * 0.22);
-    write(hs, 0.03, (_t, env) => (Math.random() * 2 - 1) * env * 0.15);
-
-    // Bass on beats 1 and 3
+    // Hi-hat every beat + offbeat
+    add(bs, 0.04, i => (Math.random() * 2 - 1) * Math.exp(-i / sr * 80) * 0.25);
+    add(hs, 0.03, i => (Math.random() * 2 - 1) * Math.exp(-i / sr * 100) * 0.18);
+    // Bass on 1 & 3
     if (beat === 0 || beat === 2) {
-      const freq = beat === 0 ? 55 : 49;
-      write(bs, 0.38, (t, env) =>
-        (Math.sin(2 * Math.PI * freq * t) * 0.7 +
-         Math.sin(2 * Math.PI * freq * 2 * t) * 0.15) * env * 0.45
-      );
+      const f = beat === 0 ? 55 : 49;
+      add(bs, 0.4, i => {
+        const t = i / sr;
+        return (Math.sin(2 * Math.PI * f * t) * 0.7 + Math.sin(4 * Math.PI * f * t) * 0.15)
+          * Math.exp(-t * 12) * 0.5;
+      });
     }
   }
-
   return buf;
 }
 
@@ -87,26 +86,21 @@ function getCachedBuffer(ctx: AudioContext, bpm: number): AudioBuffer {
   return bufferCache.get(key)!;
 }
 
-function createDeckChain(ctx: AudioContext): Omit<DeckAudio, 'playing' | 'bpm' | 'sourceNode'> {
+function buildChain(ctx: AudioContext): Omit<DeckAudio, 'playing' | 'bpm' | 'sourceNode'> {
   const gainNode = ctx.createGain();
   gainNode.gain.value = 0;
 
   const eqLow = ctx.createBiquadFilter();
-  eqLow.type = 'lowshelf';
-  eqLow.frequency.value = 250;
+  eqLow.type = 'lowshelf'; eqLow.frequency.value = 250;
 
   const eqMid = ctx.createBiquadFilter();
-  eqMid.type = 'peaking';
-  eqMid.frequency.value = 1000;
-  eqMid.Q.value = 1;
+  eqMid.type = 'peaking'; eqMid.frequency.value = 1000; eqMid.Q.value = 1;
 
   const eqHigh = ctx.createBiquadFilter();
-  eqHigh.type = 'highshelf';
-  eqHigh.frequency.value = 4000;
+  eqHigh.type = 'highshelf'; eqHigh.frequency.value = 4000;
 
   const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = ctx.sampleRate / 2;
+  filter.type = 'lowpass'; filter.frequency.value = ctx.sampleRate / 2;
 
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 256;
@@ -124,81 +118,67 @@ function createDeckChain(ctx: AudioContext): Omit<DeckAudio, 'playing' | 'bpm' |
 export function useAudioEngine() {
   const decksRef = useRef<{ a: DeckAudio | null; b: DeckAudio | null }>({ a: null, b: null });
 
-  const initDeck = useCallback((deckId: 'a' | 'b'): DeckAudio => {
-    const ctx = getAudioContext();
-    const chain = createDeckChain(ctx);
-    const deck: DeckAudio = { ...chain, sourceNode: null, playing: false, bpm: 128 };
-    decksRef.current[deckId] = deck;
+  const initDeck = useCallback((id: 'a' | 'b'): DeckAudio => {
+    const ctx = getOrCreateContext();
+    const deck: DeckAudio = { ...buildChain(ctx), sourceNode: null, playing: false, bpm: 128 };
+    decksRef.current[id] = deck;
     return deck;
   }, []);
 
-  const getDeck = useCallback((deckId: 'a' | 'b'): DeckAudio => {
-    return decksRef.current[deckId] ?? initDeck(deckId);
-  }, [initDeck]);
+  const getDeck = useCallback((id: 'a' | 'b') => decksRef.current[id] ?? initDeck(id), [initDeck]);
 
-  // Call this directly inside a user tap handler to unlock iOS audio
+  // Call inside a user tap to unlock iOS audio — plays an audible beep to confirm it works
   const unlockAudio = useCallback(() => {
-    const ctx = getAudioContext();
-    const warm = () => {
-      // Pre-generate buffers for common BPMs while context is running
-      [118, 120, 122, 124, 126, 128, 130, 132, 134, 140, 142, 145, 148, 170, 174, 176].forEach(b => {
-        getCachedBuffer(ctx, b);
-      });
-      // Play a silent blip to confirm audio pipeline is open
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      g.gain.value = 0.001;
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.01);
-    };
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(warm);
-    } else {
-      warm();
-    }
+    const ctx = getOrCreateContext();
+    // Resume synchronously (no .then — keep everything in the gesture stack)
+    if (ctx.state === 'suspended') ctx.resume();
+
+    // Play an audible 440 Hz beep for 0.15s — confirms audio pipeline is open
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.frequency.value = 440;
+    g.gain.value = 0.4;
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(0);
+    osc.stop(ctx.currentTime + 0.15);
   }, []);
 
   const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number) => {
-    const ctx = getAudioContext();
+    const ctx = getOrCreateContext();
+    // Resume synchronously — don't await, just fire and the audio will queue
+    if (ctx.state === 'suspended') ctx.resume();
+
     const deck = getDeck(deckId);
     deck.playing = playing;
     deck.bpm = bpm;
 
-    const doPlay = () => {
-      if (deck.sourceNode) {
-        try { deck.sourceNode.stop(); } catch (_) {}
-        deck.sourceNode.disconnect();
-        deck.sourceNode = null;
-      }
-      if (playing) {
-        const buf = getCachedBuffer(ctx, bpm);
-        const source = ctx.createBufferSource();
-        source.buffer = buf;
-        source.loop = true;
-        source.connect(deck.gainNode);
-        source.start(0);
-        deck.sourceNode = source;
-        deck.gainNode.gain.setTargetAtTime(0.85, ctx.currentTime, 0.04);
-      } else {
-        deck.gainNode.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
-      }
-    };
+    // Stop current source
+    if (deck.sourceNode) {
+      try { deck.sourceNode.stop(0); } catch (_) {}
+      deck.sourceNode.disconnect();
+      deck.sourceNode = null;
+    }
 
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(doPlay);
+    if (playing) {
+      // Generate buffer synchronously (~10–30 ms on iPhone) — no async needed
+      const buf = getCachedBuffer(ctx, bpm);
+      const source = ctx.createBufferSource();
+      source.buffer = buf;
+      source.loop = true;
+      source.connect(deck.gainNode);
+      // Set gain directly — no setTargetAtTime so it works even if ctx just resumed
+      deck.gainNode.gain.value = 0.85;
+      source.start(0);
+      deck.sourceNode = source;
     } else {
-      doPlay();
+      deck.gainNode.gain.value = 0;
     }
   }, [getDeck]);
 
   const setVolume = useCallback((deckId: 'a' | 'b', volume: number) => {
-    const ctx = getAudioContext();
     const deck = getDeck(deckId);
-    if (deck.playing) {
-      deck.gainNode.gain.setTargetAtTime(volume * 0.85, ctx.currentTime, 0.05);
-    }
+    if (deck.playing) deck.gainNode.gain.value = volume * 0.85;
   }, [getDeck]);
 
   const setEQ = useCallback((deckId: 'a' | 'b', band: 'low' | 'mid' | 'high', value: number) => {
@@ -210,20 +190,19 @@ export function useAudioEngine() {
   }, [getDeck]);
 
   const setFilter = useCallback((deckId: 'a' | 'b', value: number) => {
-    const ctx = getAudioContext();
+    const ctx = getOrCreateContext();
     const deck = getDeck(deckId);
     const freq = 20 + (ctx.sampleRate / 2 - 20) * Math.pow(value, 3);
-    deck.filter.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
+    deck.filter.frequency.value = freq;
   }, [getDeck]);
 
   const setCrossfader = useCallback((value: number) => {
-    const ctx = getAudioContext();
     const a = decksRef.current.a;
     const b = decksRef.current.b;
     if (!a || !b) return;
     const angle = value * Math.PI * 0.5;
-    if (a.playing) a.gainNode.gain.setTargetAtTime(Math.cos(angle) * 0.85, ctx.currentTime, 0.02);
-    if (b.playing) b.gainNode.gain.setTargetAtTime(Math.sin(angle) * 0.85, ctx.currentTime, 0.02);
+    if (a.playing) a.gainNode.gain.value = Math.cos(angle) * 0.85;
+    if (b.playing) b.gainNode.gain.value = Math.sin(angle) * 0.85;
   }, []);
 
   const getAnalyserData = useCallback((deckId: 'a' | 'b'): Uint8Array => {
@@ -237,7 +216,8 @@ export function useAudioEngine() {
   useEffect(() => {
     return () => {
       [decksRef.current.a, decksRef.current.b].forEach(d => {
-        if (d?.sourceNode) { try { d.sourceNode.stop(); } catch (_) {} }
+        if (!d) return;
+        try { d.sourceNode?.stop(0); } catch (_) {}
       });
     };
   }, []);
