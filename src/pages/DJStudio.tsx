@@ -57,6 +57,20 @@ export function DJStudio() {
     return () => clearInterval(recordTimerRef.current);
   }, [isRecording]);
 
+  // Forward EQ knob changes from the store to the audio engine
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setEQ('a', 'high', deckA.eqHigh); }, [deckA.eqHigh]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setEQ('a', 'mid',  deckA.eqMid);  }, [deckA.eqMid]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setEQ('a', 'low',  deckA.eqLow);  }, [deckA.eqLow]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setEQ('b', 'high', deckB.eqHigh); }, [deckB.eqHigh]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setEQ('b', 'mid',  deckB.eqMid);  }, [deckB.eqMid]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setEQ('b', 'low',  deckB.eqLow);  }, [deckB.eqLow]);
+
   const handlePlayA = useCallback((playing: boolean) => {
     updateDeckA({ isPlaying: playing });
     const track = TRACKS.find(t => t.id === deckA.trackId);

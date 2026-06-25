@@ -68,54 +68,114 @@ function getBeatBlobUrl(bpm: number): string {
   return blobUrlCache.get(key)!;
 }
 
-// ─── Deck state ──────────────────────────────────────────────────────────────
+// ─── Deck chain ──────────────────────────────────────────────────────────────
 
-interface DeckState {
+interface DeckChain {
   audioEl: HTMLAudioElement;
+  // Web Audio nodes (null when Web Audio is unavailable)
+  source: MediaElementAudioSourceNode | null;
+  filters: { high: BiquadFilterNode; mid: BiquadFilterNode; low: BiquadFilterNode } | null;
+  gainNode: GainNode | null;
+  analyser: AnalyserNode | null;
   playing: boolean;
   bpm: number;
-  volume: number; // 0-1
+  volume: number;
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useAudioEngine() {
-  const decksRef = useRef<{ a: DeckState | null; b: DeckState | null }>({ a: null, b: null });
+  const ctxRef = useRef<AudioContext | null>(null);
+  const decksRef = useRef<{ a: DeckChain | null; b: DeckChain | null }>({ a: null, b: null });
 
-  const initDeck = useCallback((id: 'a' | 'b'): DeckState => {
+  const getCtx = useCallback((): AudioContext => {
+    if (!ctxRef.current || ctxRef.current.state === 'closed') {
+      ctxRef.current = new AudioContext();
+    }
+    return ctxRef.current;
+  }, []);
+
+  const initDeck = useCallback((id: 'a' | 'b'): DeckChain => {
     const audioEl = new Audio();
     audioEl.loop = true;
-    const deck: DeckState = { audioEl, playing: false, bpm: 128, volume: 1 };
-    decksRef.current[id] = deck;
-    return deck;
-  }, []);
+
+    let source: MediaElementAudioSourceNode | null = null;
+    let filters: DeckChain['filters'] = null;
+    let gainNode: GainNode | null = null;
+    let analyser: AnalyserNode | null = null;
+
+    try {
+      const ctx = getCtx();
+      source = ctx.createMediaElementSource(audioEl);
+
+      const high = ctx.createBiquadFilter();
+      high.type = 'highshelf';
+      high.frequency.value = 8000;
+      high.gain.value = 0;
+
+      const mid = ctx.createBiquadFilter();
+      mid.type = 'peaking';
+      mid.frequency.value = 1000;
+      mid.Q.value = 1;
+      mid.gain.value = 0;
+
+      const low = ctx.createBiquadFilter();
+      low.type = 'lowshelf';
+      low.frequency.value = 200;
+      low.gain.value = 0;
+
+      gainNode = ctx.createGain();
+      gainNode.gain.value = 0.85;
+
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.8;
+
+      source
+        .connect(high)
+        .connect(mid)
+        .connect(low)
+        .connect(gainNode)
+        .connect(analyser)
+        .connect(ctx.destination);
+
+      filters = { high, mid, low };
+    } catch (e) {
+      // Web Audio unavailable — fall back to plain HTML5 Audio (no EQ)
+      console.warn('Web Audio chain failed, EQ disabled:', e);
+    }
+
+    const chain: DeckChain = {
+      audioEl, source, filters, gainNode, analyser,
+      playing: false, bpm: 128, volume: 1,
+    };
+    decksRef.current[id] = chain;
+    return chain;
+  }, [getCtx]);
 
   const getDeck = useCallback((id: 'a' | 'b') => decksRef.current[id] ?? initDeck(id), [initDeck]);
 
-  // Tap inside a user gesture to pre-unlock both audio elements.
-  // Returns a debug string; onStatus fires again once the promise settles.
   const unlockAudio = useCallback((onStatus?: (s: string) => void): string => {
     const da = getDeck('a');
     const db = getDeck('b');
-
-    // A minimal silent WAV (8 bytes of audio data) to give audioEl a playable source
-    // so play() doesn't immediately reject with "no supported source".
     const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
     da.audioEl.src = SILENT;
     db.audioEl.src = SILENT;
+
+    const ctx = getCtx();
+    if (ctx.state === 'suspended') ctx.resume();
 
     Promise.all([da.audioEl.play(), db.audioEl.play()])
       .then(() => {
         da.audioEl.pause(); db.audioEl.pause();
         da.audioEl.removeAttribute('src'); db.audioEl.removeAttribute('src');
-        onStatus?.('audioEl unlocked ✓ — tap Play on a deck');
+        onStatus?.(`audio unlocked ✓ ctx:${ctx.state}`);
       })
-      .catch(e => onStatus?.(`audioEl error: ${e}`));
+      .catch(e => onStatus?.(`unlock error: ${e}`));
 
-    return 'unlocking audio elements…';
-  }, [getDeck]);
+    return 'unlocking audio…';
+  }, [getDeck, getCtx]);
 
-  // customUrl: pass a blob/object URL for uploaded files; omit to use generated beat
   const setPlaying = useCallback((deckId: 'a' | 'b', playing: boolean, bpm: number, customUrl?: string) => {
     const deck = getDeck(deckId);
     deck.playing = playing;
@@ -126,24 +186,35 @@ export function useAudioEngine() {
       return;
     }
 
+    // Resume AudioContext synchronously within the user gesture (Play button click)
+    const ctx = getCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+
     const url = customUrl ?? getBeatBlobUrl(bpm);
-    if (deck.audioEl.src !== url) {
-      deck.audioEl.src = url;
-    }
+    if (deck.audioEl.src !== url) deck.audioEl.src = url;
     deck.audioEl.loop = true;
-    deck.audioEl.volume = deck.volume * 0.85;
-    // setPlaying is always called from an onClick handler — this IS a user gesture
+    // Volume: use gainNode when Web Audio chain is active, else set directly
+    if (!deck.gainNode) deck.audioEl.volume = deck.volume * 0.85;
     deck.audioEl.play().catch(e => console.error('play error', e));
-  }, [getDeck]);
+  }, [getDeck, getCtx]);
 
   const setVolume = useCallback((deckId: 'a' | 'b', volume: number) => {
     const deck = getDeck(deckId);
     deck.volume = volume;
-    if (deck.playing) deck.audioEl.volume = volume * 0.85;
+    if (deck.gainNode) {
+      deck.gainNode.gain.value = volume * 0.85;
+    } else {
+      deck.audioEl.volume = volume * 0.85;
+    }
   }, [getDeck]);
 
-  // EQ and filter are not available in HTML5 Audio mode (visual-only)
-  const setEQ = useCallback((_deckId: 'a' | 'b', _band: 'low' | 'mid' | 'high', _value: number) => {}, []);
+  // EQ: value -1..1 maps to ±15 dB on the biquad filter
+  const setEQ = useCallback((deckId: 'a' | 'b', band: 'low' | 'mid' | 'high', value: number) => {
+    const deck = getDeck(deckId);
+    if (!deck?.filters) return;
+    deck.filters[band].gain.value = value * 15;
+  }, [getDeck]);
+
   const setFilter = useCallback((_deckId: 'a' | 'b', _value: number) => {}, []);
 
   const setCrossfader = useCallback((value: number) => {
@@ -151,29 +222,40 @@ export function useAudioEngine() {
     const b = decksRef.current.b;
     if (!a || !b) return;
     const angle = value * Math.PI * 0.5;
-    if (a.playing) a.audioEl.volume = Math.cos(angle) * a.volume * 0.85;
-    if (b.playing) b.audioEl.volume = Math.sin(angle) * b.volume * 0.85;
+    const aVol = Math.cos(angle) * a.volume * 0.85;
+    const bVol = Math.sin(angle) * b.volume * 0.85;
+    if (a.gainNode) a.gainNode.gain.value = aVol;
+    else if (a.playing) a.audioEl.volume = aVol;
+    if (b.gainNode) b.gainNode.gain.value = bVol;
+    else if (b.playing) b.audioEl.volume = bVol;
   }, []);
 
-  // No Web Audio analyser — return a BPM-reactive fake spectrum so the visualizer
-  // still looks alive when music is playing.
   const getAnalyserData = useCallback((deckId: 'a' | 'b'): Uint8Array => {
     const deck = decksRef.current[deckId];
     const SIZE = 32;
     const data = new Uint8Array(SIZE);
     if (!deck?.playing) return data;
 
+    // Use real FFT data when Web Audio chain is active
+    if (deck.analyser) {
+      const buf = new Uint8Array(deck.analyser.frequencyBinCount);
+      deck.analyser.getByteFrequencyData(buf);
+      for (let i = 0; i < SIZE; i++) {
+        data[i] = buf[Math.floor(i * buf.length / SIZE)];
+      }
+      return data;
+    }
+
+    // Fallback: BPM-reactive fake spectrum
     const t = deck.audioEl.currentTime;
     const bpm = deck.bpm;
     const beatPos = ((t * bpm) / 60) % 4;
     const beatFrac = beatPos % 1;
-
     const kickEnv = (beatPos < 2 && beatFrac < 0.25) ? (1 - beatFrac / 0.25) : 0;
     const snareEnv = (beatPos >= 1 && beatFrac < 0.2) ? (1 - beatFrac / 0.2) : 0;
-
     for (let i = 0; i < SIZE; i++) {
       const f = i / SIZE;
-      let lvl = 15 + Math.random() * 10; // noise floor
+      let lvl = 15 + Math.random() * 10;
       if (f < 0.15) lvl += kickEnv * 200 * (1 - f / 0.15);
       if (f > 0.2 && f < 0.5) lvl += snareEnv * 120 * Math.random();
       if (f > 0.65) lvl += 20 * Math.random();
@@ -188,6 +270,7 @@ export function useAudioEngine() {
         if (!d) return;
         try { d.audioEl.pause(); } catch (_) {}
       });
+      try { ctxRef.current?.close(); } catch (_) {}
     };
   }, []);
 
