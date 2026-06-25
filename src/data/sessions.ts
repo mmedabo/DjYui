@@ -27,7 +27,7 @@ export const SESSIONS: Session[] = [
           'Modern DJs use digital software, CDJs, or vinyl turntables',
           'The key skill is LISTENING — great DJs develop exceptional ears',
         ],
-        challenge: 'Listen to 3 DJ mixes online and identify where one song transitions to the next'
+        challenge: 'Head to the DJ Studio (tap the Studio button below). Load a track on Deck A and press Play. Listen to the beat pattern — count how many times you hear the kick drum before you press Pause. That\'s your first DJ listening exercise!'
       },
       {
         id: '1-2',
