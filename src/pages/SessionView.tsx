@@ -243,45 +243,67 @@ export function SessionView() {
             transition={{ delay: 0.5 }}
             className="mb-5"
           >
-            <button
-              onClick={() => setShowChallenge(c => !c)}
-              className="w-full rounded-2xl p-4 flex items-center gap-3 text-left transition-all"
-              style={{
-                background: showChallenge ? `${color}15` : '#111',
-                border: `1px solid ${showChallenge ? color + '60' : 'rgba(255,255,255,0.08)'}`,
-              }}
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: `${color}20` }}>
-                <Target size={18} style={{ color }} />
-              </div>
-              <div className="flex-1">
-                <div className="font-bold text-white text-sm">Practice Challenge</div>
-                <div className="text-xs text-white/40 mt-0.5">+100 XP — Click to reveal</div>
-              </div>
-              <ChevronRight size={16} className={`text-white/30 transition-transform ${showChallenge ? 'rotate-90' : ''}`} />
-            </button>
-
-            <AnimatePresence>
-              {showChallenge && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
+            <AnimatePresence mode="wait">
+              {!showChallenge ? (
+                <motion.button
+                  key="start"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowChallenge(true)}
+                  className="w-full rounded-2xl p-5 flex items-center gap-4 text-left transition-all active:scale-95"
+                  style={{
+                    background: `linear-gradient(135deg, ${color}25, ${color}10)`,
+                    border: `1.5px solid ${color}60`,
+                    boxShadow: `0 0 20px ${color}20`,
+                  }}
                 >
-                  <div className="glass rounded-2xl p-4 mt-2 flex items-start gap-3">
-                    <span className="text-2xl">🎯</span>
-                    <div>
-                      <p className="text-white/80 text-sm leading-relaxed">{lesson.challenge}</p>
-                      <button
-                        onClick={() => { addXP(100); setShowChallenge(false); }}
-                        className="mt-3 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:scale-105"
-                        style={{ background: `${color}30`, color, border: `1px solid ${color}50` }}
-                      >
-                        ✓ Mark Challenge Complete (+100 XP)
-                      </button>
-                    </div>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: `${color}30`, boxShadow: `0 0 12px ${color}40` }}>
+                    <Target size={22} style={{ color }} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-black text-white text-base">Start Challenge</div>
+                    <div className="text-xs mt-0.5" style={{ color: `${color}cc` }}>Earn +100 XP • Tap to begin</div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ background: color }}>
+                    <Play size={14} className="text-black ml-0.5" />
+                  </div>
+                </motion.button>
+              ) : (
+                <motion.div
+                  key="challenge"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="rounded-2xl p-5"
+                  style={{
+                    background: `${color}12`,
+                    border: `1.5px solid ${color}50`,
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target size={16} style={{ color }} />
+                    <span className="font-black text-white text-sm">Your Challenge</span>
+                    <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-bold"
+                      style={{ background: `${color}25`, color }}>+100 XP</span>
+                  </div>
+                  <p className="text-white/80 text-sm leading-relaxed mb-4">{lesson.challenge}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { addXP(100); setShowChallenge(false); }}
+                      className="flex-1 py-3 rounded-xl font-bold text-sm transition-all active:scale-95"
+                      style={{ background: color, color: '#000' }}
+                    >
+                      ✓ Done! Claim +100 XP
+                    </button>
+                    <button
+                      onClick={() => setShowChallenge(false)}
+                      className="px-4 py-3 rounded-xl text-sm text-white/40 hover:text-white/60 transition-colors glass"
+                    >
+                      Later
+                    </button>
                   </div>
                 </motion.div>
               )}
