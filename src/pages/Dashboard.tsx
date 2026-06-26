@@ -50,6 +50,7 @@ export function Dashboard() {
           <Disc3 size={14} style={{ color: '#a855f7' }} />
           <span className="font-black text-white text-sm">DJ YUI</span>
         </button>
+        <span className="text-xs uppercase tracking-widest" style={{ color: '#333' }}>Dashboard</span>
         <div className="flex items-center gap-1.5">
           {([
             { label: 'Studio', icon: Music2, page: 'studio' },

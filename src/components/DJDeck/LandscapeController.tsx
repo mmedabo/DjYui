@@ -50,12 +50,13 @@ function HotCues({ cues, position, onUpdate }: {
 }) {
   const handle = useCallback((i: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const next = [...cues];
+    // Fixed-size 4-slot array – clear by setting to undefined, preserving other slots
+    const next: (number | undefined)[] = [cues[0], cues[1], cues[2], cues[3]];
     if (e.shiftKey && next[i] !== undefined) {
-      next.splice(i, 1, undefined as unknown as number);
-      onUpdate({ cues: next.filter(c => c !== undefined) as number[] });
+      next[i] = undefined;
+      onUpdate({ cues: next as number[] });
     } else if (next[i] !== undefined) {
-      onUpdate({ position: next[i] });
+      onUpdate({ position: next[i] as number });
     } else {
       next[i] = position;
       onUpdate({ cues: next as number[] });
@@ -97,7 +98,10 @@ function BeatLoops({ beatLoopSize, loopActive, position, onUpdate }: {
         return (
           <button
             key={beats}
-            onClick={() => onUpdate({ beatLoopSize: beats, loopActive: true, loopStart: position, loopEnd: Math.min(1, position + beats / 128) })}
+            onClick={() => {
+              if (isActive) { onUpdate({ loopActive: false }); return; }
+              onUpdate({ beatLoopSize: beats, loopActive: true, loopStart: position, loopEnd: Math.min(1, position + beats / 128) });
+            }}
             className="h-6 rounded text-xs font-black transition-all active:scale-95"
             style={{
               background: isActive ? '#a855f715' : '#0d0d0d',
@@ -123,6 +127,7 @@ function BeatJumps({ position, onUpdate }: { position: number; onUpdate: (p: Par
             onClick={() => onUpdate({ position: Math.max(0, position - beats / 128) })}
             className="h-6 rounded flex items-center justify-center transition-all active:scale-95"
             style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', color: '#333' }}
+            title={`Jump back ${beats} beats`}
           >
             <ChevronsLeft size={10} />
           </button>
@@ -131,6 +136,7 @@ function BeatJumps({ position, onUpdate }: { position: number; onUpdate: (p: Par
             onClick={() => onUpdate({ position: Math.min(1, position + beats / 128) })}
             className="h-6 rounded flex items-center justify-center transition-all active:scale-95"
             style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', color: '#333' }}
+            title={`Jump forward ${beats} beats`}
           >
             <ChevronsRight size={10} />
           </button>

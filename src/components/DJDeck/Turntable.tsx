@@ -115,12 +115,13 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
 
   const handleHotCue = useCallback((i: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const newCues = [...state.cues];
+    // Use a fixed-size 4-element sparse array (undefined = empty slot)
+    const newCues: (number | undefined)[] = [state.cues[0], state.cues[1], state.cues[2], state.cues[3]];
     if (e.shiftKey && newCues[i] !== undefined) {
-      newCues.splice(i, 1, undefined as unknown as number);
-      onUpdate({ cues: newCues.filter(c => c !== undefined) as number[] });
+      newCues[i] = undefined; // clear slot, preserving other slots
+      onUpdate({ cues: newCues as number[] });
     } else if (newCues[i] !== undefined) {
-      onUpdate({ position: newCues[i] });
+      onUpdate({ position: newCues[i] as number });
     } else {
       newCues[i] = snapToQuantize(state.position);
       onUpdate({ cues: newCues as number[] });
@@ -128,6 +129,11 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
   }, [state.cues, state.position, onUpdate, snapToQuantize]);
 
   const handleBeatLoop = useCallback((beats: number) => {
+    // Toggle off if same loop size already active (Pioneer behavior)
+    if (state.loopActive && state.beatLoopSize === beats) {
+      onUpdate({ loopActive: false });
+      return;
+    }
     const loopLen = beats / 128; // fraction of our 4-bar loop at 128 BPM base
     onUpdate({
       beatLoopSize: beats,
@@ -135,11 +141,11 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
       loopStart: snapToQuantize(state.position),
       loopEnd: Math.min(1, snapToQuantize(state.position) + loopLen),
     });
-  }, [state.position, onUpdate, snapToQuantize]);
+  }, [state.position, state.loopActive, state.beatLoopSize, onUpdate, snapToQuantize]);
 
   const handleBeatJump = useCallback((beats: number) => {
-    const jumpLen = beats / 128;
-    const newPos = Math.max(0, Math.min(1, state.position + (beats > 0 ? jumpLen : -jumpLen)));
+    // beats is signed: negative = backward, positive = forward
+    const newPos = Math.max(0, Math.min(1, state.position + beats / 128));
     onUpdate({ position: newPos });
   }, [state.position, onUpdate]);
 
