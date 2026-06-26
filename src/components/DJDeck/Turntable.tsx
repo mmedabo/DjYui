@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Play, Pause, SkipBack, Repeat } from 'lucide-react';
+import { Play, Pause, SkipBack, Repeat, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { TRACKS } from '../../data/tracks';
 import type { DeckState } from '../../types';
 
@@ -16,32 +15,50 @@ interface Props {
 }
 
 const CUE_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#06b6d4'];
+const BEAT_LOOPS = [0.5, 1, 2, 4, 8, 16];
+const BEAT_JUMP_SIZES = [1, 2, 4, 8];
+
+type PadMode = 'hotcue' | 'beatloop' | 'beatjump';
+
+function ToggleBtn({
+  active, label, color, onClick,
+}: { active: boolean; label: string; color: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-2 py-1 rounded text-xs font-bold uppercase tracking-wider transition-all"
+      style={{
+        background: active ? `${color}22` : '#111',
+        border: `1px solid ${active ? color : '#252525'}`,
+        color: active ? color : '#3a3a3a',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
 export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBpm, customTrackName }: Props) {
   const track = TRACKS.find(t => t.id === state.trackId);
   const isDragging = useRef(false);
   const dragStartAngle = useRef(0);
   const [angle, setAngle] = useState(0);
+  const [padMode, setPadMode] = useState<PadMode>('hotcue');
   const animRef = useRef<number | undefined>(undefined);
   const vinylRef = useRef<HTMLDivElement>(null);
 
   const deckColor = deck === 'A' ? '#a855f7' : '#06b6d4';
   const color = track?.color || deckColor;
-
-  // BPM accounting for pitch: pitch is -1..1 representing ±8% tempo change
   const actualBpm = track ? Math.round(track.bpm * (1 + state.pitch * 0.08)) : state.bpm;
-  const pitchPercent = (state.pitch * 8).toFixed(1);
+  const pitchStr = (state.pitch * 8).toFixed(1);
 
-  // Vinyl spin animation
   useEffect(() => {
     if (state.isPlaying && !isDragging.current) {
       const rps = actualBpm / 60 / 4;
       const degPerMs = rps * 360 / 1000;
       let last = performance.now();
-
       const animate = (now: number) => {
-        const delta = now - last;
-        last = now;
+        const delta = now - last; last = now;
         setAngle(a => (a + degPerMs * delta) % 360);
         animRef.current = requestAnimationFrame(animate);
       };
@@ -50,184 +67,209 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [state.isPlaying, actualBpm]);
 
-  // Scratch / jog wheel drag
-  const getAngleFromEvent = useCallback((cx: number, cy: number, rect: DOMRect) => {
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    return Math.atan2(cy - centerY, cx - centerX) * (180 / Math.PI);
+  const getAngle = useCallback((cx: number, cy: number, rect: DOMRect) => {
+    const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    return Math.atan2(cy - y, cx - x) * (180 / Math.PI);
   }, []);
 
-  const onVinylMouseDown = useCallback((e: React.MouseEvent) => {
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
     if (!vinylRef.current) return;
     e.preventDefault();
     isDragging.current = true;
     const rect = vinylRef.current.getBoundingClientRect();
     dragStartAngle.current = angle;
-    const startEventAngle = getAngleFromEvent(e.clientX, e.clientY, rect);
-
+    const startA = getAngle(e.clientX, e.clientY, rect);
     const onMove = (me: MouseEvent) => {
       if (!isDragging.current || !vinylRef.current) return;
-      const r = vinylRef.current.getBoundingClientRect();
-      const diff = getAngleFromEvent(me.clientX, me.clientY, r) - startEventAngle;
+      const diff = getAngle(me.clientX, me.clientY, vinylRef.current.getBoundingClientRect()) - startA;
       setAngle((dragStartAngle.current + diff) % 360);
     };
-    const onUp = () => {
-      isDragging.current = false;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
+    const onUp = () => { isDragging.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, [angle, getAngleFromEvent]);
+  }, [angle, getAngle]);
 
-  const onVinylTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!vinylRef.current || e.touches.length === 0) return;
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!vinylRef.current || !e.touches.length) return;
     isDragging.current = true;
     const rect = vinylRef.current.getBoundingClientRect();
     dragStartAngle.current = angle;
-    const startEventAngle = getAngleFromEvent(e.touches[0].clientX, e.touches[0].clientY, rect);
-
+    const startA = getAngle(e.touches[0].clientX, e.touches[0].clientY, rect);
     const onMove = (te: TouchEvent) => {
-      if (!isDragging.current || !vinylRef.current || te.touches.length === 0) return;
+      if (!isDragging.current || !vinylRef.current || !te.touches.length) return;
       te.preventDefault();
-      const r = vinylRef.current.getBoundingClientRect();
-      const diff = getAngleFromEvent(te.touches[0].clientX, te.touches[0].clientY, r) - startEventAngle;
+      const diff = getAngle(te.touches[0].clientX, te.touches[0].clientY, vinylRef.current.getBoundingClientRect()) - startA;
       setAngle((dragStartAngle.current + diff) % 360);
     };
-    const onUp = () => {
-      isDragging.current = false;
-      window.removeEventListener('touchmove', onMove);
-      window.removeEventListener('touchend', onUp);
-    };
+    const onUp = () => { isDragging.current = false; window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onUp); };
     window.addEventListener('touchmove', onMove, { passive: false });
     window.addEventListener('touchend', onUp);
-  }, [angle, getAngleFromEvent]);
+  }, [angle, getAngle]);
 
-  // Hot cue handlers
+  const snapToQuantize = useCallback((pos: number) => {
+    if (!state.quantize) return pos;
+    // Snap to nearest 1/16 beat (beat loop is 4 bars = 1.0, so 1/16 = 0.0625/4)
+    const grid = 0.0625 / 4;
+    return Math.round(pos / grid) * grid;
+  }, [state.quantize]);
+
   const handleHotCue = useCallback((i: number, e: React.MouseEvent) => {
     e.stopPropagation();
     const newCues = [...state.cues];
     if (e.shiftKey && newCues[i] !== undefined) {
-      // Shift+click: delete cue
       newCues.splice(i, 1, undefined as unknown as number);
       onUpdate({ cues: newCues.filter(c => c !== undefined) as number[] });
     } else if (newCues[i] !== undefined) {
-      // Jump to cue
       onUpdate({ position: newCues[i] });
     } else {
-      // Set cue at current position
-      newCues[i] = state.position;
+      newCues[i] = snapToQuantize(state.position);
       onUpdate({ cues: newCues as number[] });
     }
-  }, [state.cues, state.position, onUpdate]);
+  }, [state.cues, state.position, onUpdate, snapToQuantize]);
+
+  const handleBeatLoop = useCallback((beats: number) => {
+    const loopLen = beats / 128; // fraction of our 4-bar loop at 128 BPM base
+    onUpdate({
+      beatLoopSize: beats,
+      loopActive: true,
+      loopStart: snapToQuantize(state.position),
+      loopEnd: Math.min(1, snapToQuantize(state.position) + loopLen),
+    });
+  }, [state.position, onUpdate, snapToQuantize]);
+
+  const handleBeatJump = useCallback((beats: number) => {
+    const jumpLen = beats / 128;
+    const newPos = Math.max(0, Math.min(1, state.position + (beats > 0 ? jumpLen : -jumpLen)));
+    onUpdate({ position: newPos });
+  }, [state.position, onUpdate]);
 
   const canSync = onSync && syncBpm && syncBpm > 0;
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Track info */}
+      {/* Track info + BPM */}
       <div className="text-center w-full">
-        <div className="text-xs text-white/30 uppercase tracking-widest mb-1">DECK {deck}</div>
+        <div className="flex items-center justify-center gap-3 mb-1">
+          <div className="text-xs font-black uppercase tracking-widest" style={{ color: deckColor }}>DECK {deck}</div>
+          <div
+            className="text-sm font-black font-mono tabular-nums px-2 py-0.5 rounded"
+            style={{ background: `${deckColor}18`, color: deckColor }}
+          >
+            {actualBpm} BPM
+          </div>
+          <div
+            className="text-xs font-mono"
+            style={{ color: Math.abs(state.pitch) < 0.01 ? '#10b981' : '#666' }}
+          >
+            {state.pitch > 0.005 ? '+' : state.pitch < -0.005 ? '' : '±'}{pitchStr}%
+          </div>
+        </div>
+
         {(track || customTrackName) ? (
           <>
-            <div className="font-bold text-white text-sm leading-tight truncate">{customTrackName ?? track?.name}</div>
-            <div className="text-xs text-white/40 truncate">{customTrackName ? 'Your upload' : track?.artist}</div>
-            <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
-              <span className="text-xs px-2 py-0.5 rounded-full font-mono font-bold"
-                style={{ background: color + '22', border: `1px solid ${color}44`, color }}>
-                {actualBpm} BPM
-              </span>
-              {track && <>
-                <span className="text-xs rounded px-1.5 py-0.5" style={{ background: '#1a1a2e', color: 'rgba(255,255,255,0.5)' }}>{track.key}</span>
-                <span className="text-xs text-white/30">{track.genre}</span>
-              </>}
+            <div className="font-bold text-white text-sm truncate">{customTrackName ?? track?.name}</div>
+            <div className="text-xs truncate" style={{ color: '#555' }}>
+              {customTrackName ? 'Your upload' : `${track?.artist} · ${track?.key} · ${track?.genre}`}
             </div>
           </>
         ) : (
-          <div className="text-sm text-white/20 italic py-1">No track loaded</div>
+          <div className="text-sm italic" style={{ color: '#2a2a2a' }}>No track loaded</div>
         )}
       </div>
 
-      {/* Vinyl record */}
+      {/* Vinyl */}
       <div className="relative" style={{ width: 176, height: 176 }}>
-        {/* Platter base */}
         <div
           className="absolute inset-0 rounded-full"
           style={{
-            background: 'radial-gradient(circle at 40% 35%, #222238, #0d0d1a)',
-            boxShadow: `0 0 30px ${deckColor}18, inset 0 2px 12px rgba(0,0,0,0.9)`,
+            background: 'radial-gradient(circle at 40% 35%, #1a1a1a, #0a0a0a)',
+            boxShadow: `0 0 24px ${deckColor}14, inset 0 2px 10px rgba(0,0,0,0.9)`,
           }}
         />
-
-        {/* Spinning vinyl */}
         <div
           ref={vinylRef}
           className="absolute inset-2 rounded-full cursor-grab active:cursor-grabbing"
           style={{ transform: `rotate(${angle}deg)` }}
-          onMouseDown={onVinylMouseDown}
-          onTouchStart={onVinylTouchStart}
+          onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
         >
           <svg viewBox="0 0 160 160" className="w-full h-full">
             <defs>
               <radialGradient id={`vg-${deck}`} cx="50%" cy="50%">
-                <stop offset="0%" stopColor="#1e1e1e" />
-                <stop offset="100%" stopColor="#080808" />
+                <stop offset="0%" stopColor="#1a1a1a" />
+                <stop offset="100%" stopColor="#060606" />
               </radialGradient>
             </defs>
             <circle cx="80" cy="80" r="78" fill={`url(#vg-${deck})`} />
-            {/* Grooves */}
             {[18, 24, 30, 38, 46, 54, 60, 66].map(r => (
-              <circle key={r} cx="80" cy="80" r={r} fill="none" stroke="#1e1e24" strokeWidth="0.6" />
+              <circle key={r} cx="80" cy="80" r={r} fill="none" stroke="#1c1c1c" strokeWidth="0.7" />
             ))}
-            {/* Colored label */}
-            <circle cx="80" cy="80" r="23" fill={color} opacity="0.12" />
-            <circle cx="80" cy="80" r="21" fill="#0f0f18" stroke={color} strokeWidth="1.5" strokeOpacity="0.6" />
-            <text x="80" y="76" textAnchor="middle" fill={color} fontSize="5" fontWeight="700" opacity="0.9">
+            <circle cx="80" cy="80" r="23" fill={color} opacity="0.1" />
+            <circle cx="80" cy="80" r="21" fill="#0a0a0a" stroke={color} strokeWidth="1.2" strokeOpacity="0.5" />
+            <text x="80" y="77" textAnchor="middle" fill={color} fontSize="5" fontWeight="700" opacity="0.8">
               {track?.genre?.toUpperCase().slice(0, 8) || 'DJ YUI'}
             </text>
-            <text x="80" y="84" textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize="4">
-              {track?.name?.slice(0, 12) || ''}
+            <text x="80" y="85" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="3.5">
+              {track?.name?.slice(0, 14) || ''}
             </text>
-            <circle cx="80" cy="80" r="3" fill="#0a0a0f" />
-            {/* Reflection */}
-            <ellipse cx="62" cy="52" rx="9" ry="3" fill="white" opacity="0.025" transform="rotate(-30,62,52)" />
+            <circle cx="80" cy="80" r="3" fill="#080808" />
           </svg>
         </div>
-
-        {/* Center spindle */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-3 h-3 rounded-full border border-zinc-600" style={{ background: '#111' }} />
+          <div className="w-3 h-3 rounded-full" style={{ background: '#111', border: '1px solid #2a2a2a' }} />
         </div>
-
-        {/* Playing glow ring */}
         {state.isPlaying && (
-          <motion.div
+          <div
             className="absolute -inset-1.5 rounded-full pointer-events-none"
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 1.2, repeat: Infinity }}
-            style={{ border: `2px solid ${deckColor}`, boxShadow: `0 0 16px ${deckColor}` }}
+            style={{
+              border: `1.5px solid ${deckColor}`,
+              boxShadow: `0 0 12px ${deckColor}55`,
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }}
           />
         )}
       </div>
 
-      {/* Transport controls */}
+      {/* Feature toggles: SLIP · QUANT · KEY */}
+      <div className="flex items-center gap-1.5">
+        <ToggleBtn
+          active={state.slipMode}
+          label="SLIP"
+          color={deckColor}
+          onClick={() => onUpdate({ slipMode: !state.slipMode })}
+        />
+        <ToggleBtn
+          active={state.quantize}
+          label="QUANT"
+          color={deckColor}
+          onClick={() => onUpdate({ quantize: !state.quantize })}
+        />
+        <ToggleBtn
+          active={state.keyLock}
+          label="KEY"
+          color={deckColor}
+          onClick={() => onUpdate({ keyLock: !state.keyLock })}
+        />
+      </div>
+
+      {/* Transport */}
       <div className="flex items-center gap-2">
         <button
           onClick={onCue}
           title="Return to Cue"
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-white/50 hover:text-white transition-colors"
-          style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)' }}
+          className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+          style={{ background: '#111', border: '1px solid #1e1e1e', color: '#555' }}
         >
           <SkipBack size={13} />
         </button>
 
         <button
           onClick={() => onPlay(!state.isPlaying)}
-          className="w-11 h-11 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          className="w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-95"
           style={{
-            background: state.isPlaying ? `${deckColor}22` : `linear-gradient(135deg, ${deckColor}dd, ${deckColor}88)`,
+            background: state.isPlaying ? `${deckColor}20` : `${deckColor}cc`,
             border: `2px solid ${deckColor}`,
-            boxShadow: state.isPlaying ? `0 0 18px ${deckColor}60` : `0 4px 12px ${deckColor}40`,
+            boxShadow: state.isPlaying ? `0 0 16px ${deckColor}55` : `0 0 8px ${deckColor}33`,
           }}
         >
           {state.isPlaying
@@ -238,26 +280,25 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
         <button
           onClick={() => onUpdate({ loopActive: !state.loopActive })}
           title="Loop"
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
           style={{
-            background: state.loopActive ? `${deckColor}30` : '#1a1a2e',
-            border: `1px solid ${state.loopActive ? deckColor : 'rgba(255,255,255,0.08)'}`,
-            color: state.loopActive ? deckColor : 'rgba(255,255,255,0.4)',
+            background: state.loopActive ? `${deckColor}22` : '#111',
+            border: `1px solid ${state.loopActive ? deckColor : '#1e1e1e'}`,
+            color: state.loopActive ? deckColor : '#444',
           }}
         >
           <Repeat size={13} />
         </button>
 
-        {/* SYNC button */}
         {canSync && (
           <button
             onClick={onSync}
             title={`Sync to ${syncBpm} BPM`}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition-all hover:scale-105"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-all"
             style={{
-              background: 'rgba(16,185,129,0.15)',
-              border: '1px solid rgba(16,185,129,0.5)',
-              color: '#10b981',
+              background: 'rgba(34,197,94,0.12)',
+              border: '1px solid rgba(34,197,94,0.4)',
+              color: '#22c55e',
             }}
           >
             ⟲
@@ -266,60 +307,127 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
       </div>
 
       {/* Pitch fader */}
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-white/30 uppercase tracking-wider">Pitch</span>
+      <div className="flex flex-col items-center gap-1 w-full">
+        <div className="flex items-center justify-between w-full px-1">
+          <span className="text-xs uppercase tracking-widest" style={{ color: '#2a2a2a' }}>Tempo</span>
           {state.pitch !== 0 && (
             <button
               onClick={() => onUpdate({ pitch: 0 })}
-              className="text-xs text-white/20 hover:text-white/50 transition-colors"
-              title="Reset pitch"
+              className="text-xs transition-colors"
+              style={{ color: '#3a3a3a' }}
             >
-              ×
+              reset
             </button>
           )}
         </div>
         <input
-          type="range"
-          min={-1} max={1} step={0.005}
+          type="range" min={-1} max={1} step={0.005}
           value={state.pitch}
           onChange={e => onUpdate({ pitch: parseFloat(e.target.value) })}
-          className="w-28"
+          className="w-full"
           style={{ accentColor: deckColor }}
         />
-        <span
-          className="text-xs font-mono tabular-nums"
-          style={{ color: Math.abs(state.pitch) < 0.01 ? '#10b981' : deckColor }}
-        >
-          {state.pitch > 0.005 ? '+' : state.pitch < -0.005 ? '' : '±'}{pitchPercent}%
-        </span>
       </div>
 
-      {/* Hot Cues */}
+      {/* Pad mode switcher */}
       <div className="w-full">
-        <div className="text-xs text-white/20 uppercase tracking-widest text-center mb-1.5">Hot Cues</div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {[0, 1, 2, 3].map(i => {
-            const hasCue = state.cues[i] !== undefined;
-            return (
-              <button
-                key={i}
-                onClick={e => handleHotCue(i, e)}
-                title={hasCue ? 'Jump to cue · Shift+click to delete' : 'Set hot cue here'}
-                className="h-8 rounded-lg text-xs font-bold transition-all hover:brightness-125 active:scale-95 flex flex-col items-center justify-center"
-                style={{
-                  background: hasCue ? CUE_COLORS[i] + '30' : '#1a1a2e',
-                  border: `1px solid ${hasCue ? CUE_COLORS[i] : 'rgba(255,255,255,0.08)'}`,
-                  color: hasCue ? CUE_COLORS[i] : 'rgba(255,255,255,0.2)',
-                  boxShadow: hasCue ? `0 0 8px ${CUE_COLORS[i]}40` : 'none',
-                }}
-              >
-                {i + 1}
-              </button>
-            );
-          })}
+        <div className="flex rounded-lg overflow-hidden mb-2" style={{ border: '1px solid #1e1e1e' }}>
+          {(['hotcue', 'beatloop', 'beatjump'] as PadMode[]).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setPadMode(mode)}
+              className="flex-1 py-1.5 text-xs font-bold uppercase tracking-wider transition-all"
+              style={{
+                background: padMode === mode ? `${deckColor}22` : '#0d0d0d',
+                color: padMode === mode ? deckColor : '#333',
+                borderRight: mode !== 'beatjump' ? '1px solid #1e1e1e' : 'none',
+              }}
+            >
+              {mode === 'hotcue' ? 'CUE' : mode === 'beatloop' ? 'LOOP' : 'JUMP'}
+            </button>
+          ))}
         </div>
-        <p className="text-center text-xs text-white/15 mt-1">Click=jump · Shift+click=delete · Empty=set</p>
+
+        {/* HOT CUE pads */}
+        {padMode === 'hotcue' && (
+          <div className="grid grid-cols-4 gap-1.5">
+            {[0, 1, 2, 3].map(i => {
+              const hasCue = state.cues[i] !== undefined;
+              return (
+                <button
+                  key={i}
+                  onClick={e => handleHotCue(i, e)}
+                  title={hasCue ? 'Jump · Shift+click=delete' : 'Set cue'}
+                  className="h-9 rounded-lg text-xs font-black transition-all active:scale-95"
+                  style={{
+                    background: hasCue ? CUE_COLORS[i] + '25' : '#0d0d0d',
+                    border: `1px solid ${hasCue ? CUE_COLORS[i] : '#1e1e1e'}`,
+                    color: hasCue ? CUE_COLORS[i] : '#2a2a2a',
+                  }}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* BEAT LOOP pads */}
+        {padMode === 'beatloop' && (
+          <div className="grid grid-cols-6 gap-1">
+            {BEAT_LOOPS.map(beats => {
+              const isActive = state.loopActive && state.beatLoopSize === beats;
+              return (
+                <button
+                  key={beats}
+                  onClick={() => handleBeatLoop(beats)}
+                  className="h-9 rounded-lg text-xs font-black transition-all active:scale-95"
+                  style={{
+                    background: isActive ? `${deckColor}28` : '#0d0d0d',
+                    border: `1px solid ${isActive ? deckColor : '#1e1e1e'}`,
+                    color: isActive ? deckColor : '#3a3a3a',
+                    boxShadow: isActive ? `0 0 8px ${deckColor}40` : 'none',
+                  }}
+                >
+                  {beats < 1 ? `1/${Math.round(1/beats)}` : beats}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* BEAT JUMP pads */}
+        {padMode === 'beatjump' && (
+          <div className="grid grid-cols-4 gap-1.5">
+            {BEAT_JUMP_SIZES.map(beats => (
+              <div key={beats} className="flex flex-col gap-1">
+                <button
+                  onClick={() => handleBeatJump(-beats)}
+                  className="h-8 rounded-lg flex items-center justify-center transition-all active:scale-95"
+                  style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', color: '#444' }}
+                  title={`Jump back ${beats} beats`}
+                >
+                  <ChevronsLeft size={11} />
+                </button>
+                <div className="text-center text-xs font-bold" style={{ color: '#252525' }}>{beats}</div>
+                <button
+                  onClick={() => handleBeatJump(beats)}
+                  className="h-8 rounded-lg flex items-center justify-center transition-all active:scale-95"
+                  style={{ background: '#0d0d0d', border: '1px solid #1e1e1e', color: '#444' }}
+                  title={`Jump forward ${beats} beats`}
+                >
+                  <ChevronsRight size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="text-center text-xs mt-1.5" style={{ color: '#252525' }}>
+          {padMode === 'hotcue' && 'Tap=jump · Shift+tap=delete · Empty=set'}
+          {padMode === 'beatloop' && 'Loop length in beats'}
+          {padMode === 'beatjump' && 'Jump backward ↑ · forward ↓'}
+        </p>
       </div>
     </div>
   );

@@ -77,6 +77,10 @@ const defaultDeck = (): DeckState => ({
   loopEnd: 0.25,
   position: 0,
   cues: [],
+  slipMode: false,
+  keyLock: false,
+  quantize: false,
+  beatLoopSize: 4,
 });
 
 const defaultStats = (): StudioStats => ({

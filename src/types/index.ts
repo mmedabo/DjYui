@@ -52,6 +52,10 @@ export interface DeckState {
   loopEnd: number;
   position: number;   // 0-1 playback position
   cues: number[];     // hot cue positions 0-1
+  slipMode: boolean;
+  keyLock: boolean;
+  quantize: boolean;
+  beatLoopSize: number; // in beats: 0.5, 1, 2, 4, 8, 16, 32
 }
 
 export interface MixerState {

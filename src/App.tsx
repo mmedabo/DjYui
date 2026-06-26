@@ -4,7 +4,6 @@ import { Dashboard } from './pages/Dashboard';
 import { SessionView } from './pages/SessionView';
 import { DJStudio } from './pages/DJStudio';
 import { Compositions } from './pages/Compositions';
-import { YUIPanel } from './components/YUI/YUIPanel';
 import { AchievementsPanel } from './components/Achievements/AchievementsPanel';
 import { useAppStore } from './store/appStore';
 import './index.css';
@@ -19,7 +18,7 @@ export default function App() {
   const { currentPage, setPage } = useAppStore();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#000000' }}>
+    <div style={{ minHeight: '100vh', background: '#080808' }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentPage}
@@ -40,8 +39,6 @@ export default function App() {
         </motion.div>
       </AnimatePresence>
 
-      {/* YUI persistent panel — not on landing, studio, achievements, or session (session has inline YUI) */}
-      {currentPage !== 'landing' && currentPage !== 'studio' && currentPage !== 'achievements' && currentPage !== 'session' && <YUIPanel />}
     </div>
   );
 }

@@ -1,27 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Save, Headphones, Trophy } from 'lucide-react';
+import { ChevronLeft, Save, Disc3, Trophy } from 'lucide-react';
 import { Turntable } from '../components/DJDeck/Turntable';
 import { Mixer } from '../components/DJDeck/Mixer';
 import { AudioVisualizer } from '../components/DJDeck/AudioVisualizer';
 import { TrackSelector } from '../components/DJDeck/TrackSelector';
 import { LandscapeController } from '../components/DJDeck/LandscapeController';
-import { YUICharacter } from '../components/YUI/YUICharacter';
 import { useAppStore } from '../store/appStore';
 import { useAudioEngine } from '../hooks/useAudioEngine';
 import { TRACKS } from '../data/tracks';
-import type { Composition, YUIExpression } from '../types';
-
-const YUI_TIPS = [
-  { msg: "Use the crossfader to blend between Deck A and B smoothly! 🎛️", expr: 'teaching' },
-  { msg: "Try matching the BPM on both decks before mixing them together! 🥁", expr: 'teaching' },
-  { msg: "The EQ knobs control bass, mid, and treble — kill the bass when switching tracks! ⚡", expr: 'encouraging' },
-  { msg: "Pitch fader adjusts tempo. Double-click a knob to reset it to center! 🎵", expr: 'neutral' },
-  { msg: "Hot cues (1–4) let you jump to marked positions instantly! 🎯", expr: 'excited' },
-  { msg: "Try using reverb for smooth track exits! Let it wash out beautifully! ✨", expr: 'excited' },
-  { msg: "Loading different BPM tracks? Use SYNC to match their tempo! 💪", expr: 'encouraging' },
-  { msg: "Hit RECORD then mix freely — save your session as a composition! 🎤", expr: 'teaching' },
-];
+import type { Composition } from '../types';
 
 type MobileTab = 'a' | 'mix' | 'b';
 
@@ -30,7 +18,6 @@ export function DJStudio() {
   const audio = useAudioEngine();
 
   const [mobileTab, setMobileTab] = useState<MobileTab>('a');
-  const [yuiTipIdx, setYuiTipIdx] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -45,12 +32,6 @@ export function DJStudio() {
   const [customNameB, setCustomNameB] = useState<string | null>(null);
 
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const yuiTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-
-  useEffect(() => {
-    yuiTimerRef.current = setInterval(() => setYuiTipIdx(i => (i + 1) % YUI_TIPS.length), 8000);
-    return () => clearInterval(yuiTimerRef.current);
-  }, []);
 
   useEffect(() => {
     const update = () => setIsLandscape(window.innerWidth > window.innerHeight);
@@ -190,8 +171,6 @@ export function DJStudio() {
   };
 
   const fmt = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
-  const currentTip = YUI_TIPS[yuiTipIdx];
-
   const bpmA = (() => {
     const t = TRACKS.find(t => t.id === deckA.trackId);
     return Math.round((t?.bpm || deckA.bpm) * (1 + deckA.pitch * 0.08));
@@ -204,7 +183,7 @@ export function DJStudio() {
   // ─── Shared deck panels ────────────────────────────────────────────────────
 
   const DeckAPanel = (
-    <div className="glass rounded-3xl p-4">
+    <div className="rounded-2xl p-4" style={{ background: '#0d0d0d', border: '1px solid #1a1a1a' }}>
       <Turntable
         deck="A"
         state={deckA}
@@ -219,13 +198,13 @@ export function DJStudio() {
   );
 
   const MixerPanel = (
-    <div className="glass rounded-3xl py-4" style={{ minWidth: 0 }}>
+    <div className="rounded-2xl py-4" style={{ minWidth: 0, background: '#0a0a0a', border: '1px solid #1a1a1a' }}>
       <Mixer onCrossfaderChange={handleCrossfader} />
     </div>
   );
 
   const DeckBPanel = (
-    <div className="glass rounded-3xl p-4">
+    <div className="rounded-2xl p-4" style={{ background: '#0d0d0d', border: '1px solid #1a1a1a' }}>
       <Turntable
         deck="B"
         state={deckB}
@@ -274,64 +253,75 @@ export function DJStudio() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#000000' }}>
-      {/* Background */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div style={{ background: 'radial-gradient(ellipse at 20% 50%, rgba(204,0,255,0.05) 0%, transparent 50%), radial-gradient(ellipse at 80% 30%, rgba(0,255,255,0.04) 0%, transparent 50%)' }}
-          className="absolute inset-0" />
-      </div>
-
+    <div className="min-h-screen flex flex-col" style={{ background: '#080808' }}>
       {/* Header */}
-      <header className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <button onClick={() => setPage('dashboard')} className="flex items-center gap-2 text-white/60 hover:text-white transition-colors">
-          <ChevronLeft size={16} />
-          <span className="text-sm">Dashboard</span>
+      <header
+        className="relative z-10 flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: '1px solid #141414' }}
+      >
+        <button
+          onClick={() => setPage('dashboard')}
+          className="flex items-center gap-1.5 text-sm transition-colors"
+          style={{ color: '#555' }}
+        >
+          <ChevronLeft size={15} />
+          <span>Dashboard</span>
         </button>
         <div className="flex items-center gap-2">
-          <Headphones size={16} className="text-purple-400" />
-          <span className="font-bold text-white text-sm">DJ Studio</span>
+          <Disc3 size={14} style={{ color: '#a855f7' }} />
+          <span className="font-black text-white text-sm">DJ Studio</span>
           {isRecording && (
-            <motion.div animate={{ opacity: [1, 0, 1] }} transition={{ duration: 1, repeat: Infinity }}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/20 border border-red-500/40">
-              <div className="w-2 h-2 rounded-full bg-red-500" />
+            <motion.div
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)' }}
+            >
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#ef4444' }} />
               <span className="text-xs text-red-400 font-mono">{fmt(recordingTime)}</span>
             </motion.div>
           )}
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setPage('achievements')}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold glass text-white/60 hover:text-white transition-colors flex items-center gap-1">
-            <Trophy size={11} className="text-yellow-400" /> <span className="hidden sm:inline">Achievements</span>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setPage('achievements')}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            style={{ background: '#111', border: '1px solid #1e1e1e', color: '#666' }}
+          >
+            <Trophy size={11} style={{ color: '#f59e0b' }} />
+            <span className="hidden sm:inline">Awards</span>
           </button>
           <button
             onClick={handleToggleRecord}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={isRecording
-              ? { background: '#ef444420', border: '1px solid #ef4444', color: '#ef4444' }
-              : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+              ? { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.5)', color: '#ef4444' }
+              : { background: '#111', border: '1px solid #1e1e1e', color: '#666' }}
           >
-            {isRecording ? '⏹' : '⏺'} <span className="hidden sm:inline">{isRecording ? 'Stop' : 'Record'}</span>
+            {isRecording ? '⏹' : '⏺'} <span className="hidden sm:inline">{isRecording ? 'Stop' : 'Rec'}</span>
           </button>
           {!isRecording && recordingTime > 0 && (
-            <button onClick={() => setShowSaveModal(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold glass text-white/70 hover:text-white flex items-center gap-1">
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+              style={{ background: '#111', border: '1px solid #1e1e1e', color: '#666' }}
+            >
               <Save size={11} /> <span className="hidden sm:inline">Save</span>
             </button>
           )}
         </div>
       </header>
 
-      <div className="relative z-10 flex flex-col gap-3 p-3 flex-1">
+      <div className="relative z-10 flex flex-col gap-2.5 p-3 flex-1">
 
-        {/* Visualizer row — always visible, two decks side by side */}
+        {/* Visualizer row — always visible */}
         <div className="grid grid-cols-2 gap-2">
-          {/* Deck A viz */}
-          <div className="glass rounded-2xl p-3">
+          <div className="rounded-xl p-2.5" style={{ background: '#0d0d0d', border: '1px solid #1a1a1a' }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Deck A</span>
-              <span className="text-xs text-white/30 font-mono">{bpmA} BPM</span>
+              <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#a855f7' }}>A</span>
+              <span className="text-xs font-mono" style={{ color: '#333' }}>{bpmA} BPM</span>
             </div>
-            <AudioVisualizer getAnalyserData={() => audio.getAnalyserData('a')} isPlaying={deckA.isPlaying} color="#a855f7" height={36} style="bars" />
+            <AudioVisualizer getAnalyserData={() => audio.getAnalyserData('a')} isPlaying={deckA.isPlaying} color="#a855f7" height={32} style="bars" />
             <div className="mt-2">
               <TrackSelector
                 deck="A"
@@ -343,18 +333,17 @@ export function DJStudio() {
             </div>
           </div>
 
-          {/* Deck B viz */}
-          <div className="glass rounded-2xl p-3">
+          <div className="rounded-xl p-2.5" style={{ background: '#0d0d0d', border: '1px solid #1a1a1a' }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Deck B</span>
+              <span className="text-xs font-black uppercase tracking-widest" style={{ color: '#06b6d4' }}>B</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-white/30 font-mono">{bpmB} BPM</span>
+                <span className="text-xs font-mono" style={{ color: '#333' }}>{bpmB} BPM</span>
                 {deckA.trackId && deckB.trackId && bpmA !== bpmB && (
-                  <span className="text-xs text-yellow-400/70 font-mono">Δ{Math.abs(bpmA - bpmB)}</span>
+                  <span className="text-xs font-mono" style={{ color: '#f59e0b66' }}>Δ{Math.abs(bpmA - bpmB)}</span>
                 )}
               </div>
             </div>
-            <AudioVisualizer getAnalyserData={() => audio.getAnalyserData('b')} isPlaying={deckB.isPlaying} color="#06b6d4" height={36} style="bars" />
+            <AudioVisualizer getAnalyserData={() => audio.getAnalyserData('b')} isPlaying={deckB.isPlaying} color="#06b6d4" height={32} style="bars" />
             <div className="mt-2">
               <TrackSelector
                 deck="B"
@@ -367,18 +356,17 @@ export function DJStudio() {
           </div>
         </div>
 
-        {/* ── MOBILE: tab switcher + single-panel view ─────────────────── */}
+        {/* MOBILE: tab switcher */}
         <div className="lg:hidden">
-          {/* Tab bar */}
-          <div className="flex rounded-2xl overflow-hidden border border-white/8 mb-3">
+          <div className="flex rounded-xl overflow-hidden mb-2.5" style={{ border: '1px solid #1a1a1a' }}>
             {([['a', 'Deck A', '#a855f7'], ['mix', 'Mixer', '#f59e0b'], ['b', 'Deck B', '#06b6d4']] as const).map(([tab, label, color]) => (
               <button
                 key={tab}
                 onClick={() => setMobileTab(tab as MobileTab)}
-                className="flex-1 py-2.5 text-xs font-bold transition-all"
+                className="flex-1 py-2 text-xs font-bold transition-all"
                 style={{
-                  background: mobileTab === tab ? `${color}25` : 'transparent',
-                  color: mobileTab === tab ? color : 'rgba(255,255,255,0.35)',
+                  background: mobileTab === tab ? `${color}18` : 'transparent',
+                  color: mobileTab === tab ? color : '#2a2a2a',
                   borderBottom: `2px solid ${mobileTab === tab ? color : 'transparent'}`,
                 }}
               >
@@ -390,10 +378,10 @@ export function DJStudio() {
           <AnimatePresence mode="wait">
             <motion.div
               key={mobileTab}
-              initial={{ opacity: 0, x: mobileTab === 'a' ? -20 : mobileTab === 'b' ? 20 : 0, scale: 0.98 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: 0.18 }}
+              initial={{ opacity: 0, x: mobileTab === 'a' ? -12 : mobileTab === 'b' ? 12 : 0 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
             >
               {mobileTab === 'a' && DeckAPanel}
               {mobileTab === 'mix' && MixerPanel}
@@ -402,29 +390,12 @@ export function DJStudio() {
           </AnimatePresence>
         </div>
 
-        {/* ── DESKTOP: 3-column grid ───────────────────────────────────── */}
-        <div className="hidden lg:grid lg:grid-cols-[1fr_280px_1fr] gap-4 items-start">
+        {/* DESKTOP: 3-column grid */}
+        <div className="hidden lg:grid lg:grid-cols-[1fr_280px_1fr] gap-3 items-start">
           {DeckAPanel}
           {MixerPanel}
           {DeckBPanel}
         </div>
-
-        {/* YUI tip bar */}
-        <motion.div
-          className="glass rounded-2xl p-3 flex items-center gap-3"
-          key={yuiTipIdx}
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="shrink-0">
-            <YUICharacter expression={currentTip.expr as YUIExpression} size="sm" showBubble={false} floating={false} />
-          </div>
-          <p className="text-sm text-white/70 flex-1">{currentTip.msg}</p>
-          <button onClick={() => setYuiTipIdx(i => (i + 1) % YUI_TIPS.length)}
-            className="shrink-0 text-xs text-white/30 hover:text-white/60 transition-colors whitespace-nowrap">
-            next →
-          </button>
-        </motion.div>
       </div>
 
       {/* Save Mix Modal */}
@@ -432,12 +403,14 @@ export function DJStudio() {
         {showSaveModal && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
             onClick={e => e.target === e.currentTarget && setShowSaveModal(false)}
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="glass-dark rounded-3xl p-6 w-full max-w-sm"
+              className="rounded-2xl p-6 w-full max-w-sm"
+              style={{ background: '#0f0f0f', border: '1px solid #252525' }}
             >
               <div className="text-center mb-6">
                 <div className="text-3xl mb-2">💿</div>
