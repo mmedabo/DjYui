@@ -5,6 +5,7 @@ import { Turntable } from '../components/DJDeck/Turntable';
 import { Mixer } from '../components/DJDeck/Mixer';
 import { AudioVisualizer } from '../components/DJDeck/AudioVisualizer';
 import { TrackSelector } from '../components/DJDeck/TrackSelector';
+import { LandscapeController } from '../components/DJDeck/LandscapeController';
 import { YUICharacter } from '../components/YUI/YUICharacter';
 import { useAppStore } from '../store/appStore';
 import { useAudioEngine } from '../hooks/useAudioEngine';
@@ -25,7 +26,7 @@ const YUI_TIPS = [
 type MobileTab = 'a' | 'mix' | 'b';
 
 export function DJStudio() {
-  const { deckA, deckB, mixer, updateDeckA, updateDeckB, setPage, addComposition, incrementStat } = useAppStore();
+  const { deckA, deckB, mixer, updateDeckA, updateDeckB, updateMixer, setPage, addComposition, incrementStat } = useAppStore();
   const audio = useAudioEngine();
 
   const [mobileTab, setMobileTab] = useState<MobileTab>('a');
@@ -34,6 +35,9 @@ export function DJStudio() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [mixName, setMixName] = useState('');
+  const [isLandscape, setIsLandscape] = useState(
+    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
+  );
 
   // Custom uploaded track state
   const customUrlRef = useRef<{ a: string | null; b: string | null }>({ a: null, b: null });
@@ -46,6 +50,16 @@ export function DJStudio() {
   useEffect(() => {
     yuiTimerRef.current = setInterval(() => setYuiTipIdx(i => (i + 1) % YUI_TIPS.length), 8000);
     return () => clearInterval(yuiTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    const update = () => setIsLandscape(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
   }, []);
 
   useEffect(() => {
@@ -147,6 +161,12 @@ export function DJStudio() {
     updateDeckA({ pitch: Math.max(-1, Math.min(1, (targetBpm - baseBpmA) / (baseBpmA * 0.08))) });
   }, [deckA.trackId, deckA.bpm, deckB.trackId, deckB.bpm, updateDeckA]);
 
+  const handleToggleRecord = useCallback(() => {
+    const was = isRecording;
+    setIsRecording(r => !r);
+    if (was && recordingTime > 0) setShowSaveModal(true);
+  }, [isRecording, recordingTime]);
+
   const handleSaveMix = () => {
     if (!mixName.trim()) return;
     const trackA = TRACKS.find(t => t.id === deckA.trackId);
@@ -219,6 +239,40 @@ export function DJStudio() {
     </div>
   );
 
+  if (isLandscape) {
+    return (
+      <LandscapeController
+        deckA={deckA}
+        deckB={deckB}
+        mixer={mixer}
+        customNameA={customNameA ?? undefined}
+        customNameB={customNameB ?? undefined}
+        bpmA={bpmA}
+        bpmB={bpmB}
+        updateDeckA={updateDeckA}
+        updateDeckB={updateDeckB}
+        updateMixer={updateMixer}
+        onPlayA={handlePlayA}
+        onPlayB={handlePlayB}
+        onCueA={() => updateDeckA({ position: 0, isPlaying: false })}
+        onCueB={() => updateDeckB({ position: 0, isPlaying: false })}
+        onSyncA={handleSyncAtoB}
+        onSyncB={handleSyncBtoA}
+        onSelectA={handleSelectTrackA}
+        onSelectB={handleSelectTrackB}
+        onUploadA={handleUploadA}
+        onUploadB={handleUploadB}
+        onCrossfaderChange={handleCrossfader}
+        getAnalyserDataA={() => audio.getAnalyserData('a')}
+        getAnalyserDataB={() => audio.getAnalyserData('b')}
+        isRecording={isRecording}
+        recordingTime={recordingTime}
+        onToggleRecord={handleToggleRecord}
+        onBack={() => setPage('dashboard')}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#000000' }}>
       {/* Background */}
@@ -250,7 +304,7 @@ export function DJStudio() {
             <Trophy size={11} className="text-yellow-400" /> <span className="hidden sm:inline">Achievements</span>
           </button>
           <button
-            onClick={() => { const was = isRecording; setIsRecording(r => !r); if (was && recordingTime > 0) setShowSaveModal(true); }}
+            onClick={handleToggleRecord}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
             style={isRecording
               ? { background: '#ef444420', border: '1px solid #ef4444', color: '#ef4444' }
