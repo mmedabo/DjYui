@@ -106,7 +106,6 @@ export function useAudioEngine() {
 
     try {
       const ctx = getCtx();
-      source = ctx.createMediaElementSource(audioEl);
 
       const high = ctx.createBiquadFilter();
       high.type = 'highshelf';
@@ -124,25 +123,37 @@ export function useAudioEngine() {
       low.frequency.value = 200;
       low.gain.value = 0;
 
-      gainNode = ctx.createGain();
-      gainNode.gain.value = 0.85;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.85;
 
-      analyser = ctx.createAnalyser();
-      analyser.fftSize = 64;
-      analyser.smoothingTimeConstant = 0.8;
+      const analyserNode = ctx.createAnalyser();
+      analyserNode.fftSize = 64;
+      analyserNode.smoothingTimeConstant = 0.8;
 
-      source
-        .connect(high)
-        .connect(mid)
-        .connect(low)
-        .connect(gainNode)
-        .connect(analyser)
-        .connect(ctx.destination);
+      // Capture audio element — must be the last step so if connect() fails
+      // we can still reconnect source directly to destination as passthrough.
+      const src = ctx.createMediaElementSource(audioEl);
+      source = src;
+
+      // Explicit (non-chained) connect calls — chaining returns undefined on
+      // some older WebKit versions and would throw a TypeError mid-chain.
+      src.connect(high);
+      high.connect(mid);
+      mid.connect(low);
+      low.connect(gain);
+      gain.connect(analyserNode);
+      analyserNode.connect(ctx.destination);
 
       filters = { high, mid, low };
+      gainNode = gain;
+      analyser = analyserNode;
     } catch (e) {
-      // Web Audio unavailable — fall back to plain HTML5 Audio (no EQ)
       console.warn('Web Audio chain failed, EQ disabled:', e);
+      // If the audio element was captured (source set) but the chain broke,
+      // reconnect it directly to destination so audio still plays.
+      if (source && ctxRef.current) {
+        try { source.connect(ctxRef.current.destination); } catch (_) {}
+      }
     }
 
     const chain: DeckChain = {
@@ -193,9 +204,31 @@ export function useAudioEngine() {
     const url = customUrl ?? getBeatBlobUrl(bpm);
     if (deck.audioEl.src !== url) deck.audioEl.src = url;
     deck.audioEl.loop = true;
-    // Volume: use gainNode when Web Audio chain is active, else set directly
     if (!deck.gainNode) deck.audioEl.volume = deck.volume * 0.85;
     deck.audioEl.play().catch(e => console.error('play error', e));
+
+    // Safety net: if the AudioContext fails to unlock within 400 ms (e.g. iOS Chrome
+    // blocks ctx.destination), swap the captured audio element for a plain HTML5 one
+    // so audio always comes out even without EQ.
+    if (deck.source) {
+      const savedUrl = url;
+      setTimeout(() => {
+        const d = decksRef.current[deckId];
+        if (!d?.playing || ctxRef.current?.state === 'running') return;
+        // Context still suspended — fall back to a fresh uncaptured element
+        const el = new Audio();
+        el.loop = true;
+        el.src = savedUrl;
+        el.volume = d.volume * 0.85;
+        d.audioEl.pause();
+        d.audioEl = el;
+        d.source = null;
+        d.filters = null;
+        d.gainNode = null;
+        d.analyser = null;
+        el.play().catch(e => console.error('fallback play error', e));
+      }, 400);
+    }
   }, [getDeck, getCtx]);
 
   const setVolume = useCallback((deckId: 'a' | 'b', volume: number) => {

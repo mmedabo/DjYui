@@ -57,6 +57,12 @@ export function DJStudio() {
     return () => clearInterval(recordTimerRef.current);
   }, [isRecording]);
 
+  // Forward volume fader changes from the store to the audio engine
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setVolume('a', deckA.volume); }, [deckA.volume]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setVolume('b', deckB.volume); }, [deckB.volume]);
+
   // Forward EQ knob changes from the store to the audio engine
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { audio.setEQ('a', 'high', deckA.eqHigh); }, [deckA.eqHigh]);
