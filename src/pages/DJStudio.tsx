@@ -52,13 +52,13 @@ export function DJStudio() {
     return () => clearInterval(recordTimerRef.current);
   }, [isRecording]);
 
-  // Forward volume fader changes from the store to the audio engine
+  // ── Volume ──────────────────────────────────────────────────────────────────
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { audio.setVolume('a', deckA.volume); }, [deckA.volume]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { audio.setVolume('b', deckB.volume); }, [deckB.volume]);
 
-  // Forward EQ knob changes from the store to the audio engine
+  // ── 3-band EQ ────────────────────────────────────────────────────────────
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { audio.setEQ('a', 'high', deckA.eqHigh); }, [deckA.eqHigh]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,6 +71,57 @@ export function DJStudio() {
   useEffect(() => { audio.setEQ('b', 'mid',  deckB.eqMid);  }, [deckB.eqMid]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { audio.setEQ('b', 'low',  deckB.eqLow);  }, [deckB.eqLow]);
+
+  // ── Deck filter (filterFreq) ─────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setFilter('a', deckA.filterFreq); }, [deckA.filterFreq]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setFilter('b', deckB.filterFreq); }, [deckB.filterFreq]);
+
+  // ── Pitch / playbackRate ──────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setPitch('a', deckA.pitch); }, [deckA.pitch]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setPitch('b', deckB.pitch); }, [deckB.pitch]);
+
+  // ── Seek on position change (hot cues, beat jumps, cue return) ───────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.seekTo('a', deckA.position); }, [deckA.position]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.seekTo('b', deckB.position); }, [deckB.position]);
+
+  // ── Loop region ──────────────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setLoop('a', deckA.loopActive, deckA.loopStart, deckA.loopEnd); }, [deckA.loopActive, deckA.loopStart, deckA.loopEnd]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setLoop('b', deckB.loopActive, deckB.loopStart, deckB.loopEnd); }, [deckB.loopActive, deckB.loopStart, deckB.loopEnd]);
+
+  // ── Beat FX knobs (REV / DLY / FLT / ECH / FLG) ─────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    audio.setFX('a', 'reverb',  mixer.fxA.reverb);
+    audio.setFX('a', 'delay',   mixer.fxA.delay);
+    audio.setFX('a', 'filter',  mixer.fxA.filter);
+    audio.setFX('a', 'echo',    mixer.fxA.echo);
+    audio.setFX('a', 'flanger', mixer.fxA.flanger);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mixer.fxA.reverb, mixer.fxA.delay, mixer.fxA.filter, mixer.fxA.echo, mixer.fxA.flanger]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    audio.setFX('b', 'reverb',  mixer.fxB.reverb);
+    audio.setFX('b', 'delay',   mixer.fxB.delay);
+    audio.setFX('b', 'filter',  mixer.fxB.filter);
+    audio.setFX('b', 'echo',    mixer.fxB.echo);
+    audio.setFX('b', 'flanger', mixer.fxB.flanger);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mixer.fxB.reverb, mixer.fxB.delay, mixer.fxB.filter, mixer.fxB.echo, mixer.fxB.flanger]);
+
+  // ── Channel sweep FX ─────────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setSweepFX('a', mixer.sweepFxA); }, [mixer.sweepFxA]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { audio.setSweepFX('b', mixer.sweepFxB); }, [mixer.sweepFxB]);
 
   const handlePlayA = useCallback((playing: boolean) => {
     updateDeckA({ isPlaying: playing });
@@ -189,7 +240,7 @@ export function DJStudio() {
         state={deckA}
         onUpdate={updateDeckA}
         onPlay={handlePlayA}
-        onCue={() => updateDeckA({ position: 0, isPlaying: false })}
+        onCue={() => { updateDeckA({ position: 0, isPlaying: false }); audio.setPlaying('a', false, deckA.bpm); audio.seekTo('a', 0); }}
         onSync={handleSyncAtoB}
         syncBpm={bpmB}
         customTrackName={customNameA ?? undefined}
@@ -210,7 +261,7 @@ export function DJStudio() {
         state={deckB}
         onUpdate={updateDeckB}
         onPlay={handlePlayB}
-        onCue={() => updateDeckB({ position: 0, isPlaying: false })}
+        onCue={() => { updateDeckB({ position: 0, isPlaying: false }); audio.setPlaying('b', false, deckB.bpm); audio.seekTo('b', 0); }}
         onSync={handleSyncBtoA}
         syncBpm={bpmA}
         customTrackName={customNameB ?? undefined}
@@ -233,8 +284,8 @@ export function DJStudio() {
         updateMixer={updateMixer}
         onPlayA={handlePlayA}
         onPlayB={handlePlayB}
-        onCueA={() => updateDeckA({ position: 0, isPlaying: false })}
-        onCueB={() => updateDeckB({ position: 0, isPlaying: false })}
+        onCueA={() => { updateDeckA({ position: 0, isPlaying: false }); audio.setPlaying('a', false, deckA.bpm); audio.seekTo('a', 0); }}
+        onCueB={() => { updateDeckB({ position: 0, isPlaying: false }); audio.setPlaying('b', false, deckB.bpm); audio.seekTo('b', 0); }}
         onSyncA={handleSyncAtoB}
         onSyncB={handleSyncBtoA}
         onSelectA={handleSelectTrackA}
