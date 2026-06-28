@@ -16,9 +16,12 @@ interface Props {
 
 const CUE_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#06b6d4'];
 const BEAT_LOOPS = [0.5, 1, 2, 4, 8, 16];
+const BEAT_ROLLS = [0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8];
 const BEAT_JUMP_SIZES = [1, 2, 4, 8];
+const SAMPLER_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6'];
+const STEM_COLORS = { vocal: '#f59e0b', drums: '#ef4444', inst: '#10b981' } as const;
 
-type PadMode = 'hotcue' | 'beatloop' | 'beatjump';
+type PadMode = 'hotcue' | 'beatloop' | 'beatroll' | 'beatjump' | 'sampler';
 
 function ToggleBtn({
   active, label, color, onClick,
@@ -149,6 +152,32 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
     onUpdate({ position: newPos });
   }, [state.position, onUpdate]);
 
+  const handleBeatRoll = useCallback((beats: number) => {
+    if (state.rollActive && state.rollSize === beats) {
+      onUpdate({ rollActive: false });
+      return;
+    }
+    const rollLen = beats / 128;
+    onUpdate({
+      rollActive: true,
+      rollSize: beats,
+      loopActive: true,
+      beatLoopSize: beats,
+      loopStart: snapToQuantize(state.position),
+      loopEnd: Math.min(1, snapToQuantize(state.position) + rollLen),
+    });
+  }, [state.position, state.rollActive, state.rollSize, onUpdate, snapToQuantize]);
+
+  const handleSampler = useCallback((i: number) => {
+    const newSlots = [...state.samplerSlots] as boolean[];
+    newSlots[i] = !newSlots[i];
+    onUpdate({ samplerSlots: newSlots });
+  }, [state.samplerSlots, onUpdate]);
+
+  const handleStem = useCallback((stem: 'vocal' | 'drums' | 'inst') => {
+    onUpdate({ stems: { ...state.stems, [stem]: !state.stems[stem] } });
+  }, [state.stems, onUpdate]);
+
   const canSync = onSync && syncBpm && syncBpm > 0;
 
   return (
@@ -238,24 +267,30 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
 
       {/* Feature toggles: SLIP · QUANT · KEY */}
       <div className="flex items-center gap-1.5">
-        <ToggleBtn
-          active={state.slipMode}
-          label="SLIP"
-          color={deckColor}
-          onClick={() => onUpdate({ slipMode: !state.slipMode })}
-        />
-        <ToggleBtn
-          active={state.quantize}
-          label="QUANT"
-          color={deckColor}
-          onClick={() => onUpdate({ quantize: !state.quantize })}
-        />
-        <ToggleBtn
-          active={state.keyLock}
-          label="KEY"
-          color={deckColor}
-          onClick={() => onUpdate({ keyLock: !state.keyLock })}
-        />
+        <ToggleBtn active={state.slipMode} label="SLIP" color={deckColor} onClick={() => onUpdate({ slipMode: !state.slipMode })} />
+        <ToggleBtn active={state.quantize} label="QUANT" color={deckColor} onClick={() => onUpdate({ quantize: !state.quantize })} />
+        <ToggleBtn active={state.keyLock} label="KEY" color={deckColor} onClick={() => onUpdate({ keyLock: !state.keyLock })} />
+      </div>
+
+      {/* STEMS: Vocal · Drums · Inst (mute buttons – lit = muted, Pioneer FLX10 style) */}
+      <div className="flex items-center gap-1 w-full">
+        <span className="text-xs uppercase tracking-widest shrink-0" style={{ color: '#2a2a2a', fontSize: 9 }}>STEMS</span>
+        {(['vocal', 'drums', 'inst'] as const).map(stem => (
+          <button
+            key={stem}
+            onClick={() => handleStem(stem)}
+            title={`${state.stems[stem] ? 'Unmute' : 'Mute'} ${stem}`}
+            className="flex-1 py-1 rounded text-xs font-bold uppercase tracking-wider transition-all"
+            style={{
+              background: state.stems[stem] ? `${STEM_COLORS[stem]}25` : '#0d0d0d',
+              border: `1px solid ${state.stems[stem] ? STEM_COLORS[stem] : '#1e1e1e'}`,
+              color: state.stems[stem] ? STEM_COLORS[stem] : '#2a2a2a',
+              fontSize: 9,
+            }}
+          >
+            {stem === 'vocal' ? 'VOC' : stem === 'drums' ? 'DRM' : 'INST'}
+          </button>
+        ))}
       </div>
 
       {/* Transport */}
@@ -338,18 +373,25 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
       {/* Pad mode switcher */}
       <div className="w-full">
         <div className="flex rounded-lg overflow-hidden mb-2" style={{ border: '1px solid #1e1e1e' }}>
-          {(['hotcue', 'beatloop', 'beatjump'] as PadMode[]).map(mode => (
+          {([
+            ['hotcue', 'CUE'],
+            ['beatloop', 'LOOP'],
+            ['beatroll', 'ROLL'],
+            ['beatjump', 'JUMP'],
+            ['sampler', 'SMPL'],
+          ] as [PadMode, string][]).map(([mode, label], idx, arr) => (
             <button
               key={mode}
               onClick={() => setPadMode(mode)}
-              className="flex-1 py-1.5 text-xs font-bold uppercase tracking-wider transition-all"
+              className="flex-1 py-1.5 text-xs font-bold uppercase transition-all"
               style={{
                 background: padMode === mode ? `${deckColor}22` : '#0d0d0d',
                 color: padMode === mode ? deckColor : '#333',
-                borderRight: mode !== 'beatjump' ? '1px solid #1e1e1e' : 'none',
+                borderRight: idx < arr.length - 1 ? '1px solid #1e1e1e' : 'none',
+                fontSize: 9,
               }}
             >
-              {mode === 'hotcue' ? 'CUE' : mode === 'beatloop' ? 'LOOP' : 'JUMP'}
+              {label}
             </button>
           ))}
         </div>
@@ -402,6 +444,31 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
           </div>
         )}
 
+        {/* BEAT ROLL pads – short auto-loops, gated style */}
+        {padMode === 'beatroll' && (
+          <div className="grid grid-cols-4 gap-1.5">
+            {BEAT_ROLLS.map(beats => {
+              const isActive = state.rollActive && state.rollSize === beats;
+              return (
+                <button
+                  key={beats}
+                  onClick={() => handleBeatRoll(beats)}
+                  title={`Roll ${beats < 1 ? `1/${Math.round(1/beats)}` : beats} beats`}
+                  className="h-9 rounded-lg text-xs font-black transition-all active:scale-95"
+                  style={{
+                    background: isActive ? `${deckColor}40` : '#0d0d0d',
+                    border: `1px solid ${isActive ? deckColor : '#1e1e1e'}`,
+                    color: isActive ? deckColor : '#3a3a3a',
+                    boxShadow: isActive ? `0 0 10px ${deckColor}60` : 'none',
+                  }}
+                >
+                  {beats < 1 ? `1/${Math.round(1/beats)}` : beats}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* BEAT JUMP pads */}
         {padMode === 'beatjump' && (
           <div className="grid grid-cols-4 gap-1.5">
@@ -429,10 +496,38 @@ export function Turntable({ deck, state, onUpdate, onPlay, onCue, onSync, syncBp
           </div>
         )}
 
+        {/* SAMPLER pads – 4 trigger slots */}
+        {padMode === 'sampler' && (
+          <div className="grid grid-cols-2 gap-1.5">
+            {[0, 1, 2, 3].map(i => {
+              const isLoaded = state.samplerSlots[i];
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleSampler(i)}
+                  title={isLoaded ? `Trigger sample ${i + 1}` : `Load sample ${i + 1}`}
+                  className="h-10 rounded-lg text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
+                  style={{
+                    background: isLoaded ? `${SAMPLER_COLORS[i]}20` : '#0d0d0d',
+                    border: `1px solid ${isLoaded ? SAMPLER_COLORS[i] : '#1e1e1e'}`,
+                    color: isLoaded ? SAMPLER_COLORS[i] : '#2a2a2a',
+                    boxShadow: isLoaded ? `0 0 8px ${SAMPLER_COLORS[i]}40` : 'none',
+                    fontSize: 10,
+                  }}
+                >
+                  {isLoaded ? `▶ SMPL ${i + 1}` : `SMPL ${i + 1}`}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <p className="text-center text-xs mt-1.5" style={{ color: '#252525' }}>
           {padMode === 'hotcue' && 'Tap=jump · Shift+tap=delete · Empty=set'}
           {padMode === 'beatloop' && 'Loop length in beats'}
+          {padMode === 'beatroll' && 'Gated loop · tap again to release'}
           {padMode === 'beatjump' && 'Jump backward ↑ · forward ↓'}
+          {padMode === 'sampler' && 'Tap=load/trigger · tap again=unload'}
         </p>
       </div>
     </div>

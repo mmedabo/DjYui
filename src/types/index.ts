@@ -36,6 +36,8 @@ export interface Track {
   duration: number; // seconds
 }
 
+export type SweepFxType = 'off' | 'filter' | 'gate' | 'echo';
+
 export interface DeckState {
   trackId: string | null;
   isPlaying: boolean;
@@ -56,13 +58,19 @@ export interface DeckState {
   keyLock: boolean;
   quantize: boolean;
   beatLoopSize: number; // in beats: 0.5, 1, 2, 4, 8, 16, 32
+  stems: { vocal: boolean; drums: boolean; inst: boolean }; // true = muted
+  rollActive: boolean;
+  rollSize: number;
+  samplerSlots: boolean[]; // 4 slots, true = loaded/lit
 }
 
 export interface MixerState {
   crossfader: number; // 0 = deck A, 1 = deck B
   masterVolume: number;
-  fxA: { reverb: number; delay: number; filter: number };
-  fxB: { reverb: number; delay: number; filter: number };
+  fxA: { reverb: number; delay: number; filter: number; echo: number; flanger: number };
+  fxB: { reverb: number; delay: number; filter: number; echo: number; flanger: number };
+  sweepFxA: SweepFxType;
+  sweepFxB: SweepFxType;
 }
 
 export interface Composition {

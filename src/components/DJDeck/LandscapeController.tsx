@@ -7,9 +7,12 @@ import type { DeckState, MixerState } from '../../types/index';
 
 const CUE_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6'];
 const BEAT_LOOPS = [0.5, 1, 2, 4, 8, 16];
+const BEAT_ROLLS = [0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8];
 const BEAT_JUMP_SIZES = [1, 2, 4, 8];
+const SAMPLER_COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6'];
+const STEM_COLORS = { vocal: '#f59e0b', drums: '#ef4444', inst: '#10b981' } as const;
 
-type PadMode = 'hotcue' | 'beatloop' | 'beatjump';
+type PadMode = 'hotcue' | 'beatloop' | 'beatroll' | 'beatjump' | 'sampler';
 
 interface Props {
   deckA: DeckState;
@@ -146,34 +149,108 @@ function BeatJumps({ position, onUpdate }: { position: number; onUpdate: (p: Par
   );
 }
 
+function BeatRolls({ rollActive, rollSize, position, onUpdate, deckColor }: {
+  rollActive: boolean; rollSize: number; position: number; deckColor: string;
+  onUpdate: (p: Partial<DeckState>) => void;
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-0.5 w-full">
+      {BEAT_ROLLS.map(beats => {
+        const isActive = rollActive && rollSize === beats;
+        return (
+          <button
+            key={beats}
+            onClick={() => {
+              if (isActive) { onUpdate({ rollActive: false }); return; }
+              const rollLen = beats / 128;
+              onUpdate({ rollActive: true, rollSize: beats, loopActive: true, beatLoopSize: beats, loopStart: position, loopEnd: Math.min(1, position + rollLen) });
+            }}
+            title={`Roll ${beats < 1 ? `1/${Math.round(1/beats)}` : beats} beats`}
+            className="h-6 rounded text-xs font-black transition-all active:scale-95"
+            style={{
+              background: isActive ? `${deckColor}40` : '#0d0d0d',
+              border: `1px solid ${isActive ? deckColor : '#1e1e1e'}`,
+              color: isActive ? deckColor : '#2e2e2e',
+              fontSize: 9,
+            }}
+          >
+            {beats < 1 ? `1/${Math.round(1/beats)}` : beats}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SamplerPads({ samplerSlots, onUpdate }: {
+  samplerSlots: boolean[]; onUpdate: (p: Partial<DeckState>) => void;
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-0.5 w-full">
+      {[0, 1, 2, 3].map(i => {
+        const isLoaded = samplerSlots[i];
+        return (
+          <button
+            key={i}
+            onClick={() => {
+              const next = [...samplerSlots] as boolean[];
+              next[i] = !next[i];
+              onUpdate({ samplerSlots: next });
+            }}
+            title={isLoaded ? `Trigger sample ${i + 1}` : `Load sample ${i + 1}`}
+            className="h-6 rounded text-xs font-black transition-all active:scale-95"
+            style={{
+              background: isLoaded ? `${SAMPLER_COLORS[i]}25` : '#0d0d0d',
+              border: `1px solid ${isLoaded ? SAMPLER_COLORS[i] : '#1e1e1e'}`,
+              color: isLoaded ? SAMPLER_COLORS[i] : '#2a2a2a',
+              fontSize: 9,
+            }}
+          >
+            {isLoaded ? `▶${i + 1}` : `S${i + 1}`}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function PadSection({ deck, padMode, onUpdate, deckColor }: {
   deck: DeckState; padMode: PadMode; onUpdate: (p: Partial<DeckState>) => void; deckColor: string;
 }) {
-  void deckColor;
   if (padMode === 'hotcue') return <HotCues cues={deck.cues} position={deck.position} onUpdate={onUpdate} />;
   if (padMode === 'beatloop') return <BeatLoops beatLoopSize={deck.beatLoopSize} loopActive={deck.loopActive} position={deck.position} onUpdate={onUpdate} />;
+  if (padMode === 'beatroll') return <BeatRolls rollActive={deck.rollActive} rollSize={deck.rollSize} position={deck.position} onUpdate={onUpdate} deckColor={deckColor} />;
+  if (padMode === 'sampler') return <SamplerPads samplerSlots={deck.samplerSlots} onUpdate={onUpdate} />;
   return <BeatJumps position={deck.position} onUpdate={onUpdate} />;
 }
 
 function FeatureToggles({ deck, onUpdate, color }: { deck: DeckState; onUpdate: (p: Partial<DeckState>) => void; color: string }) {
   const tog = (key: 'slipMode' | 'keyLock' | 'quantize') => () => onUpdate({ [key]: !deck[key] });
   return (
-    <div className="flex gap-1 w-full">
-      {([['slipMode', 'SLIP'], ['quantize', 'QUANT'], ['keyLock', 'KEY']] as const).map(([k, lbl]) => (
-        <button
-          key={k}
-          onClick={tog(k)}
-          className="flex-1 py-1 rounded text-xs font-bold uppercase transition-all"
-          style={{
-            background: deck[k] ? `${color}20` : '#0d0d0d',
-            border: `1px solid ${deck[k] ? color : '#1e1e1e'}`,
-            color: deck[k] ? color : '#252525',
-            fontSize: 9,
-          }}
-        >
-          {lbl}
-        </button>
-      ))}
+    <div className="flex flex-col gap-1 w-full">
+      <div className="flex gap-1">
+        {([['slipMode', 'SLIP'], ['quantize', 'QUANT'], ['keyLock', 'KEY']] as const).map(([k, lbl]) => (
+          <button key={k} onClick={tog(k)}
+            className="flex-1 py-1 rounded text-xs font-bold uppercase transition-all"
+            style={{ background: deck[k] ? `${color}20` : '#0d0d0d', border: `1px solid ${deck[k] ? color : '#1e1e1e'}`, color: deck[k] ? color : '#252525', fontSize: 9 }}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+      {/* STEMS row */}
+      <div className="flex gap-1">
+        {(['vocal', 'drums', 'inst'] as const).map(stem => (
+          <button key={stem}
+            onClick={() => onUpdate({ stems: { ...deck.stems, [stem]: !deck.stems[stem] } })}
+            title={`${deck.stems[stem] ? 'Unmute' : 'Mute'} ${stem}`}
+            className="flex-1 py-0.5 rounded text-xs font-bold uppercase transition-all"
+            style={{ background: deck.stems[stem] ? `${STEM_COLORS[stem]}25` : '#0d0d0d', border: `1px solid ${deck.stems[stem] ? STEM_COLORS[stem] : '#1e1e1e'}`, color: deck.stems[stem] ? STEM_COLORS[stem] : '#252525', fontSize: 9 }}
+          >
+            {stem === 'vocal' ? 'VOC' : stem === 'drums' ? 'DRM' : 'INST'}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -224,19 +301,17 @@ function DeckColumn({
 
       {/* Pad mode tabs */}
       <div className="flex rounded overflow-hidden" style={{ border: '1px solid #1a1a1a' }}>
-        {(['hotcue', 'beatloop', 'beatjump'] as PadMode[]).map(mode => (
-          <button
-            key={mode}
-            onClick={() => setPadMode(mode)}
+        {([['hotcue','CUE'],['beatloop','LOOP'],['beatroll','ROLL'],['beatjump','JUMP'],['sampler','SMPL']] as [PadMode,string][]).map(([mode, label], idx, arr) => (
+          <button key={mode} onClick={() => setPadMode(mode)}
             className="flex-1 py-1 text-xs font-black uppercase transition-all"
             style={{
               background: padMode === mode ? `${deckColor}20` : '#0a0a0a',
               color: padMode === mode ? deckColor : '#252525',
-              borderRight: mode !== 'beatjump' ? '1px solid #1a1a1a' : 'none',
-              fontSize: 9,
+              borderRight: idx < arr.length - 1 ? '1px solid #1a1a1a' : 'none',
+              fontSize: 8,
             }}
           >
-            {mode === 'hotcue' ? 'CUE' : mode === 'beatloop' ? 'LOOP' : 'JUMP'}
+            {label}
           </button>
         ))}
       </div>

@@ -78,6 +78,10 @@ const defaultDeck = (): DeckState => ({
   position: 0,
   cues: [],
   slipMode: false,
+  stems: { vocal: false, drums: false, inst: false },
+  rollActive: false,
+  rollSize: 1,
+  samplerSlots: [false, false, false, false],
   keyLock: false,
   quantize: false,
   beatLoopSize: 4,
@@ -163,8 +167,10 @@ export const useAppStore = create<AppStore>()(
       mixer: {
         crossfader: 0.5,
         masterVolume: 0.85,
-        fxA: { reverb: 0, delay: 0, filter: 0 },
-        fxB: { reverb: 0, delay: 0, filter: 0 },
+        fxA: { reverb: 0, delay: 0, filter: 0, echo: 0, flanger: 0 },
+        fxB: { reverb: 0, delay: 0, filter: 0, echo: 0, flanger: 0 },
+        sweepFxA: 'off' as const,
+        sweepFxB: 'off' as const,
       },
       updateMixer: (partial) => set((s) => ({ mixer: { ...s.mixer, ...partial } })),
 
